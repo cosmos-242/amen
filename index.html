@@ -3,10 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>定石メーカー (ファンツール完成版)</title>
+<title>パズドラ風パズル (ファンツール完成版)</title>
 <style>
   :root {
     --fall-speed: 0.1s;
+    /* ★ 新規追加: ドロップが入れ替わるアニメーションの速度 */
+    --swap-speed: 0.15s; 
     --rows: 5;
     --cols: 6;
   }
@@ -48,20 +50,19 @@
   }
   .tab.active { background-color: #0088ff; color: #fff; }
 
-  /* コントロールパネルの開始位置を少し上げて、大きくなったパレットのスペースを確保 */
   #controls-container {
     position: absolute; top: 9.5%; left: 5%; width: 90%; 
     height: auto; min-height: 16%;
     background: #333; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-    box-sizing: border-box; padding: 3% 3% 4% 3%;
+    box-sizing: border-box; padding: 2.5% 3% 3% 3%;
     z-index: 20; 
   }
   .control-panel {
-    display: none; flex-direction: column; justify-content: space-around; gap: 1.5vh; height: 100%;
+    display: none; flex-direction: column; justify-content: center; gap: 1.5vh;
   }
   .control-panel.active { display: flex; }
 
-  .control-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.8vh; font-weight: bold; }
+  .control-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.6vh; font-weight: bold; }
   input[type=range] { width: 45%; accent-color: #ffd700; }
   
   .toggle-label { display: flex; align-items: center; cursor: pointer; color: #ffd700; font-weight: bold; font-size: 1.8vh; }
@@ -78,14 +79,12 @@
   }
   .size-tab.active { background-color: #e60088; color: #fff; }
 
-  #palette-desc { text-align: center; font-size: 1.8vh; font-weight: bold; color: #ffd700; margin-bottom: 2px; }
   #palette-container {
     background: #222; padding: 8px; border-radius: 8px;
     display: flex; flex-direction: column; gap: 1.2vh;
   }
-  .palette-row { display: flex; justify-content: center; gap: 1.5vw; } /* 隙間をvwに変更して均等に */
+  .palette-row { display: flex; justify-content: center; gap: 1.5vw; } 
   
-  /* ★ パレットのアイコンサイズを拡大（4.5vh -> 5.5vh、max 40px -> 55px） ★ */
   .palette-orb {
     position: relative; 
     width: 5.5vh; height: 5.5vh; max-width: 55px; max-height: 55px;
@@ -133,10 +132,14 @@
   .orb {
     position: absolute; box-sizing: border-box; cursor: grab;
     transform: scale(0.92); box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), 1px 1px 3px rgba(0,0,0,0.5);
-    transition: top 0.15s ease, left 0.15s ease, transform 0.15s ease, opacity 0.2s ease;
+    /* ★ 変更箇所: top と left の移動速度を変数(--swap-speed)で制御 */
+    transition: top var(--swap-speed) ease, left var(--swap-speed) ease, transform 0.15s ease, opacity 0.2s ease;
     border-radius: 50%;
   }
-  .orb.falling { transition: top var(--fall-speed) ease-in, left 0.15s ease, transform 0.1s ease; }
+  .orb.falling { 
+    /* 落下時の速度指定 */
+    transition: top var(--fall-speed) ease-in, left var(--swap-speed) ease, transform 0.1s ease; 
+  }
   .orb.dragging {
     transition: none; z-index: 9999 !important; 
     transform: scale(1.15) !important; opacity: 0.95;
@@ -195,6 +198,10 @@
         <label>落下速度: <span id="speed-display">0.1</span>s</label>
         <input type="range" id="speed-slider" min="0.1" max="1.0" step="0.1" value="0.1">
       </div>
+      <div class="control-row">
+        <label>入れ替わり: <span id="swap-speed-display">0.15</span>s</label>
+        <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
+      </div>
     </div>
 
     <div id="edit-controls" class="control-panel">
@@ -202,9 +209,6 @@
         <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
         <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
       </div>
-      
-      <div id="palette-desc">色を選んで盤面をなぞる</div>
-      
       <div id="palette-container">
         <div id="palette-top" class="palette-row"></div>
         <div id="palette-bottom" class="palette-row"></div>
@@ -226,7 +230,7 @@
 
 <div id="footer">
   <p class="highlight-text">
-    作成者: <a href="https://x.com/before_maple" target="_blank" rel="noopener noreferrer">秋桜</a>
+    作成者: <a href="https://x.com/あなたのID" target="_blank" rel="noopener noreferrer">あなたの名前</a>
   </p>
   <p>※当サイトは『パズル＆ドラゴンズ』の非公式ファンツール（配置シミュレーター）です。</p>
   <p>ガンホー・オンライン・エンターテイメント株式会社様、および関連企業様とは一切関係ございません。</p>
@@ -331,6 +335,12 @@
     let val = parseFloat(e.target.value).toFixed(2);
     document.getElementById('combo-speed-display').innerText = val;
   });
+  // ★ 新規追加: 入れ替わり速度のJS処理
+  document.getElementById('swap-speed-slider').addEventListener('input', (e) => {
+    let val = parseFloat(e.target.value).toFixed(2);
+    document.getElementById('swap-speed-display').innerText = val;
+    document.documentElement.style.setProperty('--swap-speed', val + 's');
+  });
 
   document.getElementById('new-board-btn').addEventListener('click', () => {
     if (!isResolving) createBoard();
@@ -428,12 +438,19 @@
     return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
   }
 
-  function getGridPos(x, y) {
+  function getGridPos(x, y, clamp = false) {
     const rect = boardEl.getBoundingClientRect();
     const cellW = rect.width / COLS;
     const cellH = rect.height / ROWS;
-    const c = Math.floor((x - rect.left) / cellW);
-    const r = Math.floor((y - rect.top) / cellH);
+    let c = Math.floor((x - rect.left) / cellW);
+    let r = Math.floor((y - rect.top) / cellH);
+
+    if (clamp) {
+      c = Math.max(0, Math.min(c, COLS - 1));
+      r = Math.max(0, Math.min(r, ROWS - 1));
+      return { r, c };
+    }
+
     if (r >= 0 && r < ROWS && c >= 0 && c < COLS) return { r, c };
     return null;
   }
@@ -444,7 +461,7 @@
     e.preventDefault();
 
     let { x, y } = getEventPos(e);
-    let targetPos = getGridPos(x, y);
+    let targetPos = getGridPos(x, y, false); 
 
     if (currentMode === 'puzzle') {
       if (!targetPos || !e.target.classList.contains('orb')) return;
@@ -454,6 +471,8 @@
 
       isDragging = true;
       boardEl.style.overflow = 'visible'; 
+      document.getElementById('board-area').style.zIndex = '30';
+      
       draggedElement.classList.add('dragging');
       updateDragPosition(x, y);
 
@@ -476,7 +495,7 @@
     e.preventDefault();
 
     let { x, y } = getEventPos(e);
-    let targetPos = getGridPos(x, y);
+    let targetPos = getGridPos(x, y, true);
 
     if (currentMode === 'puzzle' && isDragging) {
       updateDragPosition(x, y);
@@ -494,7 +513,8 @@
         currentDragCell = targetPos;
       }
     } else if (currentMode === 'edit' && isPainting) {
-      if (targetPos) paintOrb(targetPos.r, targetPos.c);
+      let exactTargetPos = getGridPos(x, y, false);
+      if (exactTargetPos) paintOrb(exactTargetPos.r, exactTargetPos.c);
     }
   }
 
@@ -503,6 +523,7 @@
       if (!isDragging) return;
       isDragging = false;
       boardEl.style.overflow = 'hidden'; 
+      document.getElementById('board-area').style.zIndex = '10';
       
       draggedElement.classList.remove('dragging');
       draggedElement.dataset.r = currentDragCell.r;
