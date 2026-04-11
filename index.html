@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>パズドラ風パズル (消せない属性・高画質バッテン版)</title>
+<title>定石メーカー (非公式ファンツール)</title>
 <style>
   :root {
     --fall-speed: 0.1s;
@@ -13,17 +13,36 @@
 
   body {
     margin: 0; padding: 0; background-color: #111;
-    display: flex; justify-content: center; align-items: center;
-    height: 100vh; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    min-height: 100vh; overflow-x: hidden; overflow-y: auto;
     font-family: sans-serif; color: #fff;
   }
   
   #app-container {
-    position: relative; width: 100vw;
+    position: relative; width: 100vw; flex-shrink: 0;
     height: calc(100vw * 16 / 9);
     max-height: 100dvh; max-width: calc(100dvh * 9 / 16);
     background-color: #222; box-shadow: 0 0 20px rgba(0,0,0,0.8);
     overflow: hidden;
+  }
+
+  /* フッター（スクロールで出現） */
+  #footer {
+    width: 100vw; max-width: calc(100dvh * 9 / 16);
+    padding: 3vh 15px 6vh 15px; box-sizing: border-box;
+    text-align: center; color: #888; font-size: 13px; line-height: 1.8;
+  }
+  #footer p { margin: 0 0 10px 0; }
+  .highlight-text { color: #aaa; font-weight: bold; }
+  
+  /* ★ X（Twitter）へのリンク用スタイル ★ */
+  #footer a {
+    color: #1da1f2; /* リンクっぽい青色 */
+    text-decoration: none;
+    padding: 2px 5px;
+  }
+  #footer a:hover {
+    text-decoration: underline;
   }
 
   #mode-tabs {
@@ -71,9 +90,7 @@
     background: #222; padding: 10px; border-radius: 8px;
     display: flex; flex-direction: column; gap: 1vh;
   }
-  .palette-row {
-    display: flex; justify-content: center; gap: 1vh;
-  }
+  .palette-row { display: flex; justify-content: center; gap: 1vh; }
   .palette-orb {
     position: relative; 
     width: 4.5vh; height: 4.5vh; max-width: 40px; max-height: 40px;
@@ -82,10 +99,7 @@
     transition: transform 0.1s;
   }
   .palette-orb.heal { border-radius: 20%; }
-  .palette-orb.selected { 
-    transform: scale(1.15); 
-    box-shadow: 0 0 0 3px #fff, 0 0 10px rgba(255, 255, 255, 0.8); 
-  }
+  .palette-orb.selected { transform: scale(1.15); box-shadow: 0 0 0 3px #fff, 0 0 10px rgba(255, 255, 255, 0.8); }
   .palette-orb.unmatchable { background: #444; }
 
   #combo-text {
@@ -149,28 +163,18 @@
   .mortal { background: url('images/dp.png') 100% 100% / 500% 200% no-repeat; border-radius: 20%; }
   .bom    { background: url('images/bom.png') center/100% 100% no-repeat, radial-gradient(circle at 30% 30%, #555, #222); }
 
-  /* ★ 消せないドロップのフィルターとバッテン（SVGで滑らかに描画） ★ */
   .unmatchable::before {
-    content: ''; position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.65); /* 暗さを微調整 */
-    border-radius: 50%; z-index: 1;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.65); border-radius: 50%; z-index: 1;
   }
   .unmatchable::after {
-    content: ''; position: absolute;
-    top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 60%; height: 60%; /* バッテンのサイズ比率 */
-    /* ギザギザにならない完全なベクターデータ（SVG）をインライン指定 */
+    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 60%; height: 60%; 
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke-linecap='round'%3E%3Cpath d='M20 20 L80 80 M80 20 L20 80' stroke='white' stroke-width='24'/%3E%3Cpath d='M20 20 L80 80 M80 20 L20 80' stroke='red' stroke-width='14'/%3E%3C/g%3E%3C/svg%3E");
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    z-index: 2;
+    background-size: contain; background-repeat: no-repeat; background-position: center; z-index: 2;
   }
-  
-  .heal.unmatchable::before, .ojama.unmatchable::before, .poison.unmatchable::before, .mortal.unmatchable::before {
-    border-radius: 20%;
-  }
+  .heal.unmatchable::before, .ojama.unmatchable::before, .poison.unmatchable::before, .mortal.unmatchable::before { border-radius: 20%; }
+
 </style>
 </head>
 <body>
@@ -223,6 +227,14 @@
     <div id="board"></div>
   </div>
 
+</div>
+
+<div id="footer">
+  <p class="highlight-text">
+    作成者: <a href="https://x.com/before_maple" target="_blank" rel="noopener noreferrer">秋桜</a>
+  </p>
+  <p>※当サイトは『パズル＆ドラゴンズ』の非公式ファンツール（配置シミュレーター）です。</p>
+  <p>ガンホー・オンライン・エンターテイメント株式会社様、および関連企業様とは一切関係ございません。</p>
 </div>
 
 <script>
@@ -409,7 +421,6 @@
     return el;
   }
 
-  /* --- 操作 --- */
   const boardEl = document.getElementById('board');
   boardEl.addEventListener('touchstart', handleInputStart, { passive: false });
   boardEl.addEventListener('mousedown', handleInputStart);
