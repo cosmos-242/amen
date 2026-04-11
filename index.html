@@ -7,7 +7,6 @@
 <style>
   :root {
     --fall-speed: 0.1s;
-    /* ★ 新規追加: ドロップが入れ替わるアニメーションの速度 */
     --swap-speed: 0.15s; 
     --rows: 5;
     --cols: 6;
@@ -132,12 +131,10 @@
   .orb {
     position: absolute; box-sizing: border-box; cursor: grab;
     transform: scale(0.92); box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), 1px 1px 3px rgba(0,0,0,0.5);
-    /* ★ 変更箇所: top と left の移動速度を変数(--swap-speed)で制御 */
     transition: top var(--swap-speed) ease, left var(--swap-speed) ease, transform 0.15s ease, opacity 0.2s ease;
     border-radius: 50%;
   }
   .orb.falling { 
-    /* 落下時の速度指定 */
     transition: top var(--fall-speed) ease-in, left var(--swap-speed) ease, transform 0.1s ease; 
   }
   .orb.dragging {
@@ -188,10 +185,10 @@
     <div id="puzzle-controls" class="control-panel active">
       <label class="toggle-label">
         <input type="checkbox" id="ochicon-toggle">
-        落ちコンあり（画面外補充）
+        落ちコンあり
       </label>
       <div class="control-row">
-        <label>消える間隔: <span id="combo-speed-display">0.20</span>s</label>
+        <label>消える速度: <span id="combo-speed-display">0.20</span>s</label>
         <input type="range" id="combo-speed-slider" min="0.05" max="1.0" step="0.05" value="0.2">
       </div>
       <div class="control-row">
@@ -199,7 +196,7 @@
         <input type="range" id="speed-slider" min="0.1" max="1.0" step="0.1" value="0.1">
       </div>
       <div class="control-row">
-        <label>入れ替わり: <span id="swap-speed-display">0.15</span>s</label>
+        <label>入れ替わり速度: <span id="swap-speed-display">0.15</span>s</label>
         <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
       </div>
     </div>
@@ -254,6 +251,9 @@
   let selectedEditColor = 'red'; 
   let isResolving = false;
   let comboCount = 0;
+  
+  // ★ 新規追加: アニメーションの強制キャンセル用ID
+  let resolveId = 0;
 
   let isDragging = false;
   let draggedElement = null;
@@ -261,11 +261,15 @@
   let isPainting = false;
   let paintUnmatchableTargetState = 'true'; 
 
+  // ★ 変更箇所: 全てのボタンから「if (isResolving) return;」を削除し、resolveIdを加算して即時キャンセルさせる
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
-      if (isResolving) return; 
       let newMode = e.target.dataset.mode;
       if (currentMode === newMode) return;
+
+      // 進行中のアニメーションを強制終了
+      resolveId++;
+      isResolving = false;
 
       if (currentMode === 'edit' && newMode === 'puzzle') saveCurrentBoardState();
       if (currentMode === 'puzzle' && newMode === 'edit') restoreBoardState();
@@ -286,7 +290,9 @@
 
   document.querySelectorAll('.size-tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
-      if (isResolving) return;
+      resolveId++;
+      isResolving = false;
+
       document.querySelectorAll('.size-tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
       
@@ -335,7 +341,6 @@
     let val = parseFloat(e.target.value).toFixed(2);
     document.getElementById('combo-speed-display').innerText = val;
   });
-  // ★ 新規追加: 入れ替わり速度のJS処理
   document.getElementById('swap-speed-slider').addEventListener('input', (e) => {
     let val = parseFloat(e.target.value).toFixed(2);
     document.getElementById('swap-speed-display').innerText = val;
@@ -343,10 +348,14 @@
   });
 
   document.getElementById('new-board-btn').addEventListener('click', () => {
-    if (!isResolving) createBoard();
+    resolveId++;
+    isResolving = false;
+    createBoard();
   });
   document.getElementById('reset-btn').addEventListener('click', () => {
-    if (!isResolving) restoreBoardState();
+    resolveId++;
+    isResolving = false;
+    restoreBoardState();
   });
 
   function createBoard() {
@@ -604,7 +613,10 @@
 
   /* --- 連鎖処理 --- */
   async function resolveMatches() {
+    resolveId++;
+    const currentResolveId = resolveId; // 実行時のIDを保存
     isResolving = true;
+    
     let isOchiconEnabled = document.getElementById('ochicon-toggle').checked;
     let comboDelayMs = parseFloat(document.getElementById('combo-speed-slider').value) * 1000;
     
@@ -644,22 +656,31 @@
         if (el) {
           el.classList.add('exploded'); 
           board[r][c] = null;
-          setTimeout(() => el.remove(), 250);
+          // 親ノードが存在するか確認してから削除（キャンセル時のエラー防止）
+          setTimeout(() => { if(el && el.parentNode) el.remove(); }, 250);
           bombExplodedThisTurn = true;
         }
       });
-      if (bombExplodedThisTurn) await sleep(250);
+      if (bombExplodedThisTurn) {
+        if (currentResolveId !== resolveId) return; // キャンセル確認
+        await sleep(250);
+        if (currentResolveId !== resolveId) return; // キャンセル確認
+      }
     }
 
     let matched = true;
 
     while (matched) {
+      if (currentResolveId !== resolveId) return; // ループ開始時にキャンセル確認
+      
       let comboGroups = findComboGroups();
 
       if (comboGroups.length === 0) {
         if (bombExplodedThisTurn) {
-          await applyGravity(isOchiconEnabled);
+          await applyGravity(isOchiconEnabled, currentResolveId);
+          if (currentResolveId !== resolveId) return;
           await sleep(100);
+          if (currentResolveId !== resolveId) return;
           bombExplodedThisTurn = false; 
           continue; 
         }
@@ -693,6 +714,8 @@
       });
 
       for (let group of comboGroups) {
+        if (currentResolveId !== resolveId) return;
+        
         comboCount++;
         document.getElementById('combo-text').innerText = `${comboCount} Combo!`;
 
@@ -702,17 +725,26 @@
             el.style.transform = 'scale(0)';
             el.style.opacity = '0';
             board[m.r][m.c] = null;
-            setTimeout(() => el.remove(), 250); 
+            setTimeout(() => { if(el && el.parentNode) el.remove(); }, 250); 
           }
         });
         await sleep(comboDelayMs); 
       }
 
+      if (currentResolveId !== resolveId) return;
       await sleep(100); 
-      await applyGravity(isOchiconEnabled); 
+      
+      if (currentResolveId !== resolveId) return;
+      await applyGravity(isOchiconEnabled, currentResolveId); 
+      
+      if (currentResolveId !== resolveId) return;
       await sleep(100); 
     }
-    isResolving = false;
+    
+    // 自分の処理が最後まで完了した時のみロックを解除
+    if (currentResolveId === resolveId) {
+      isResolving = false;
+    }
   }
 
   function findComboGroups() {
@@ -777,7 +809,7 @@
     return groups;
   }
 
-  async function applyGravity(spawnNew) {
+  async function applyGravity(spawnNew, currentResolveId) {
     let speedStr = document.documentElement.style.getPropertyValue('--fall-speed') || '0.1s';
     let fallTimeMs = parseFloat(speedStr) * 1000;
     let moved = false;
@@ -818,7 +850,9 @@
     }
 
     if (moved) {
+      if (currentResolveId && currentResolveId !== resolveId) return; // キャンセル確認
       await sleep(fallTimeMs + 50);
+      if (currentResolveId && currentResolveId !== resolveId) return; // キャンセル確認
       board.forEach(row => row.forEach(el => el && el.classList.remove('falling')));
     }
   }
