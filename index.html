@@ -68,7 +68,6 @@
   }
   #settings-modal.active { display: flex; }
   
-  /* モーダルの中身が画面の高さに収まるようにスクロール設定を追加 */
   .settings-content {
     width: 85%; max-height: 90vh; overflow-y: auto;
     background: #222; border: 2px solid #555; border-radius: 12px;
@@ -78,12 +77,22 @@
   .settings-header { text-align: center; font-size: 2.2vh; font-weight: bold; color: #fff; margin-bottom: 0.5vh; }
   .settings-subheader { text-align: center; font-size: 1.8vh; font-weight: bold; color: #ffd700; margin-top: 1vh; }
 
+  #size-tabs {
+    display: flex; width: 100%; border-radius: 6px; overflow: hidden;
+    border: 1px solid #555; box-sizing: border-box;
+  }
+  .size-tab {
+    flex: 1; text-align: center; padding: 0.8vh 0;
+    background-color: #444; color: #aaa; font-weight: bold; font-size: 1.8vh;
+    cursor: pointer; transition: 0.2s;
+  }
+  .size-tab.active { background-color: #e60088; color: #fff; }
+
   .control-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.6vh; font-weight: bold; color: #fff; }
   input[type=range] { width: 45%; accent-color: #ffd700; }
   .toggle-label { display: flex; align-items: center; cursor: pointer; color: #ffd700; font-weight: bold; font-size: 1.8vh; }
   .toggle-label input { width: 2.2vh; height: 2.2vh; margin-right: 8px; accent-color: #e60088; }
   
-  /* ★ 新規追加: 出現ドロップ設定エリアのスタイル */
   .spawn-settings {
     display: flex; flex-wrap: wrap; gap: 2vw; justify-content: center; margin-bottom: 1vh;
   }
@@ -108,17 +117,6 @@
   }
   #edit-controls.active { display: flex; }
 
-  #size-tabs {
-    display: flex; width: 100%; border-radius: 6px; overflow: hidden;
-    border: 1px solid #555; box-sizing: border-box;
-  }
-  .size-tab {
-    flex: 1; text-align: center; padding: 0.8vh 0;
-    background-color: #444; color: #aaa; font-weight: bold; font-size: 1.8vh;
-    cursor: pointer; transition: 0.2s;
-  }
-  .size-tab.active { background-color: #e60088; color: #fff; }
-
   #palette-container {
     background: #222; padding: 8px; border-radius: 8px;
     display: flex; flex-direction: column; gap: 1.2vh;
@@ -136,8 +134,12 @@
   .palette-orb.selected { transform: scale(1.15); box-shadow: 0 0 0 3px #fff, 0 0 10px rgba(255, 255, 255, 0.8); }
   .palette-orb.unmatchable { background: #444; }
 
+  /* ★ 修正: 設定ボタン(top 9.5%〜14.5%)と盤面エリアの間に収まるように配置 */
   #combo-text {
-    position: absolute; top: 32%; left: 0; width: 100%; height: 8%;
+    position: absolute; 
+    top: 16%; /* 設定メニューのすぐ下に配置 */
+    left: 0; width: 100%; 
+    height: 12%; /* 下のボタン群までの隙間をカバー */
     display: flex; justify-content: center; align-items: center;
     font-size: 4vh; font-weight: bold; color: #ffd700; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
     z-index: 5;
@@ -237,10 +239,6 @@
   <button id="settings-btn">⚙️ 設定メニュー</button>
 
   <div id="edit-controls" class="control-panel">
-    <div id="size-tabs">
-      <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
-      <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
-    </div>
     <div id="palette-container">
       <div id="palette-top" class="palette-row"></div>
       <div id="palette-bottom" class="palette-row"></div>
@@ -264,7 +262,15 @@
     <div class="settings-content">
       <div class="settings-header">設定</div>
       
-      <div class="settings-subheader">新しい盤面設定</div>
+      <div class="settings-subheader" style="margin-top: 0;">盤面サイズ設定</div>
+      <div id="size-tabs">
+        <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
+        <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+      
+      <div class="settings-subheader" style="margin-top: 0;">新しい盤面設定</div>
       <div id="spawn-settings" class="spawn-settings">
         </div>
 
@@ -318,7 +324,6 @@
   let board = [];
   let savedBoardColors = []; 
   
-  // ★ 新規追加: 現在出現するドロップのリスト
   let activeSpawnColors = [...BASE_COLORS];
 
   let unmatchableColors = new Set();
@@ -337,7 +342,6 @@
   let isPainting = false;
   let paintUnmatchableTargetState = 'true'; 
 
-  // ★ 出現ドロップ設定用チェックボックスの生成
   const spawnSettingsEl = document.getElementById('spawn-settings');
   const SPAWNABLE_COLORS = ALL_COLORS.filter(c => c !== 'unmatchable');
 
@@ -357,10 +361,8 @@
     label.appendChild(icon);
     spawnSettingsEl.appendChild(label);
     
-    // チェックボックス変更時の処理
     cb.addEventListener('change', () => {
       const cbs = document.querySelectorAll('#spawn-settings input:checked');
-      // 0個選択を防止
       if (cbs.length === 0) {
         cb.checked = true; 
         return;
@@ -368,7 +370,6 @@
       
       activeSpawnColors = Array.from(cbs).map(input => input.value);
       
-      // デフォルト6色かどうかを判定してボタン名を変える
       const isDefault = activeSpawnColors.length === 6 && BASE_COLORS.every(c => activeSpawnColors.includes(c));
       const btn = document.getElementById('new-board-btn');
       if (isDefault) {
@@ -376,7 +377,7 @@
         btn.style.backgroundColor = '#00aaff';
       } else {
         btn.innerHTML = '🆕 カスタム盤面';
-        btn.style.backgroundColor = '#aa00ff'; // カスタム時は色も少し変えて分かりやすく
+        btn.style.backgroundColor = '#aa00ff'; 
       }
     });
   });
@@ -555,10 +556,8 @@
         let color;
         let retries = 0;
         do {
-          // ★ 出現ドロップ設定で選ばれた色からランダムに取得
           color = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
           retries++;
-          // 選択色が2色以下の場合は最初から揃ってしまうことを許可して無限ループを防止
           if (activeSpawnColors.length < 3 || retries > 20) break;
         } while (
           (r >= 2 && board[r-1][c]?.dataset.color === color && board[r-2][c]?.dataset.color === color) ||
@@ -1022,7 +1021,6 @@
       
       if (spawnNew) {
         for (let r = 0; r < emptyCount; r++) {
-          // ★ 変更箇所: 落ちコンも「出現ドロップ設定」で選ばれた色からのみ降ってくる
           let newColor = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
           let newEl = createOrbElement(newColor, r, c);
           
