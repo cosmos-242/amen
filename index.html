@@ -29,13 +29,15 @@
 
   #footer {
     width: 100vw; max-width: calc(100dvh * 9 / 16);
-    padding: 3vh 15px 6vh 15px; box-sizing: border-box;
+    padding: 1.5vh 15px 4vh 15px; box-sizing: border-box;
     text-align: center; color: #888; font-size: 13px; line-height: 1.8;
   }
   #footer p { margin: 0 0 10px 0; }
   .highlight-text { color: #aaa; font-weight: bold; }
   #footer a { color: #1da1f2; text-decoration: none; padding: 2px 5px; }
   #footer a:hover { text-decoration: underline; }
+
+  .hidden { display: none !important; }
 
   #mode-tabs {
     position: absolute; top: 2%; left: 5%; width: 90%; height: 6%;
@@ -49,23 +51,62 @@
   }
   .tab.active { background-color: #0088ff; color: #fff; }
 
-  #controls-container {
+  #settings-btn {
+    position: absolute; top: 9.5%; left: 5%; width: 90%; height: 5%;
+    background: #333; color: #fff; font-size: 1.8vh; font-weight: bold;
+    border: 1px solid #555; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 1vw;
+    z-index: 20; transition: background 0.2s;
+  }
+  #settings-btn:active { transform: translateY(2px); box-shadow: none; }
+
+  #settings-modal {
+    position: absolute; top: 0; left: 0; width: 100vw; height: calc(100vw * 16 / 9);
+    max-height: 100dvh; max-width: calc(100dvh * 9 / 16);
+    background: rgba(0,0,0,0.75); z-index: 9999;
+    display: none; justify-content: center; align-items: center;
+  }
+  #settings-modal.active { display: flex; }
+  
+  /* モーダルの中身が画面の高さに収まるようにスクロール設定を追加 */
+  .settings-content {
+    width: 85%; max-height: 90vh; overflow-y: auto;
+    background: #222; border: 2px solid #555; border-radius: 12px;
+    padding: 5%; box-sizing: border-box; display: flex; flex-direction: column; gap: 1.5vh;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.9);
+  }
+  .settings-header { text-align: center; font-size: 2.2vh; font-weight: bold; color: #fff; margin-bottom: 0.5vh; }
+  .settings-subheader { text-align: center; font-size: 1.8vh; font-weight: bold; color: #ffd700; margin-top: 1vh; }
+
+  .control-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.6vh; font-weight: bold; color: #fff; }
+  input[type=range] { width: 45%; accent-color: #ffd700; }
+  .toggle-label { display: flex; align-items: center; cursor: pointer; color: #ffd700; font-weight: bold; font-size: 1.8vh; }
+  .toggle-label input { width: 2.2vh; height: 2.2vh; margin-right: 8px; accent-color: #e60088; }
+  
+  /* ★ 新規追加: 出現ドロップ設定エリアのスタイル */
+  .spawn-settings {
+    display: flex; flex-wrap: wrap; gap: 2vw; justify-content: center; margin-bottom: 1vh;
+  }
+  .spawn-item {
+    display: flex; align-items: center; gap: 0.5vw; cursor: pointer;
+  }
+  .spawn-item input { width: 1.8vh; height: 1.8vh; accent-color: #e60088; margin: 0; }
+
+  .close-btn { 
+    margin-top: 1vh; padding: 1.5vh; background: #e60088; color: white; border: none; 
+    border-radius: 8px; font-weight: bold; font-size: 1.8vh; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  .close-btn:active { transform: translateY(2px); box-shadow: none; }
+
+  #edit-controls {
     position: absolute; top: 9.5%; left: 5%; width: 90%; 
     height: auto; min-height: 16%;
     background: #333; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
     box-sizing: border-box; padding: 2.5% 3% 3% 3%;
     z-index: 20; 
-  }
-  .control-panel {
     display: none; flex-direction: column; justify-content: center; gap: 1.5vh;
   }
-  .control-panel.active { display: flex; }
-
-  .control-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.6vh; font-weight: bold; }
-  input[type=range] { width: 45%; accent-color: #ffd700; }
-  
-  .toggle-label { display: flex; align-items: center; cursor: pointer; color: #ffd700; font-weight: bold; font-size: 1.8vh; }
-  .toggle-label input { width: 2.2vh; height: 2.2vh; margin-right: 8px; accent-color: #e60088; }
+  #edit-controls.active { display: flex; }
 
   #size-tabs {
     display: flex; width: 100%; border-radius: 6px; overflow: hidden;
@@ -103,8 +144,8 @@
   }
 
   #board-area {
-    position: absolute; bottom: 8%; left: 2%; width: 96%;
-    display: flex; flex-direction: column; gap: 1vh; z-index: 10; 
+    position: absolute; bottom: 2.5%; left: 2%; width: 96%;
+    display: flex; flex-direction: column; gap: 0.8vh; z-index: 10; 
   }
 
   #board-buttons {
@@ -118,6 +159,20 @@
   #board-buttons button:active { transform: translateY(2px); box-shadow: none; }
   #new-board-btn { background-color: #00aaff; }
   #reset-btn { background-color: #e60088; }
+
+  #drop-counts {
+    display: flex; flex-wrap: wrap; justify-content: center; 
+    gap: 0.2vh 0; width: 100%; min-height: 4vh; align-items: center; margin: 0.2vh 0;
+  }
+  .count-item {
+    display: flex; align-items: center; justify-content: center; gap: 0.5vw;
+    width: 20%; font-size: 2.4vh; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+  }
+  .mini-orb {
+    width: 3.2vh; height: 3.2vh; border-radius: 50%;
+    box-shadow: inset -1px -1px 2px rgba(0,0,0,0.4), 1px 1px 2px rgba(0,0,0,0.5);
+  }
+  .mini-orb.heal, .mini-orb.ojama, .mini-orb.poison, .mini-orb.mortal { border-radius: 20%; }
 
   #board {
     position: relative; width: 100%; aspect-ratio: var(--cols) / var(--rows);
@@ -134,9 +189,7 @@
     transition: top var(--swap-speed) ease, left var(--swap-speed) ease, transform 0.15s ease, opacity 0.2s ease;
     border-radius: 50%;
   }
-  .orb.falling { 
-    transition: top var(--fall-speed) ease-in, left var(--swap-speed) ease, transform 0.1s ease; 
-  }
+  .orb.falling { transition: top var(--fall-speed) ease-in, left var(--swap-speed) ease, transform 0.1s ease; }
   .orb.dragging {
     transition: none; z-index: 9999 !important; 
     transform: scale(1.15) !important; opacity: 0.95;
@@ -181,12 +234,52 @@
     <div class="tab" data-mode="edit">配置モード</div>
   </div>
 
-  <div id="controls-container">
-    <div id="puzzle-controls" class="control-panel active">
+  <button id="settings-btn">⚙️ 設定メニュー</button>
+
+  <div id="edit-controls" class="control-panel">
+    <div id="size-tabs">
+      <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
+      <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
+    </div>
+    <div id="palette-container">
+      <div id="palette-top" class="palette-row"></div>
+      <div id="palette-bottom" class="palette-row"></div>
+    </div>
+  </div>
+
+  <div id="combo-text"></div>
+  
+  <div id="board-area">
+    <div id="board-buttons">
+      <button id="new-board-btn">🆕 新しい盤面</button>
+      <button id="reset-btn">🔄 リセット</button>
+    </div>
+    
+    <div id="drop-counts"></div>
+    
+    <div id="board"></div>
+  </div>
+
+  <div id="settings-modal">
+    <div class="settings-content">
+      <div class="settings-header">設定</div>
+      
+      <div class="settings-subheader">新しい盤面設定</div>
+      <div id="spawn-settings" class="spawn-settings">
+        </div>
+
+      <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
       <label class="toggle-label">
-        <input type="checkbox" id="ochicon-toggle">
-        落ちコンあり
+        <input type="checkbox" id="ochicon-toggle"> 落ちコンあり
       </label>
+      
+      <label class="toggle-label">
+        <input type="checkbox" id="count-toggle" checked> ドロップ個数表示
+      </label>
+
+      <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
       <div class="control-row">
         <label>消える速度: <span id="combo-speed-display">0.20</span>s</label>
         <input type="range" id="combo-speed-slider" min="0.05" max="1.0" step="0.05" value="0.2">
@@ -199,28 +292,9 @@
         <label>入れ替わり速度: <span id="swap-speed-display">0.15</span>s</label>
         <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
       </div>
+      
+      <button id="close-settings-btn" class="close-btn">閉じる</button>
     </div>
-
-    <div id="edit-controls" class="control-panel">
-      <div id="size-tabs">
-        <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
-        <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
-      </div>
-      <div id="palette-container">
-        <div id="palette-top" class="palette-row"></div>
-        <div id="palette-bottom" class="palette-row"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="combo-text"></div>
-  
-  <div id="board-area">
-    <div id="board-buttons">
-      <button id="new-board-btn">🆕 新しい盤面</button>
-      <button id="reset-btn">🔄 リセット</button>
-    </div>
-    <div id="board"></div>
   </div>
 
 </div>
@@ -244,6 +318,9 @@
   let board = [];
   let savedBoardColors = []; 
   
+  // ★ 新規追加: 現在出現するドロップのリスト
+  let activeSpawnColors = [...BASE_COLORS];
+
   let unmatchableColors = new Set();
   let savedUnmatchableColors = new Set();
   
@@ -252,7 +329,6 @@
   let isResolving = false;
   let comboCount = 0;
   
-  // ★ 新規追加: アニメーションの強制キャンセル用ID
   let resolveId = 0;
 
   let isDragging = false;
@@ -261,13 +337,120 @@
   let isPainting = false;
   let paintUnmatchableTargetState = 'true'; 
 
-  // ★ 変更箇所: 全てのボタンから「if (isResolving) return;」を削除し、resolveIdを加算して即時キャンセルさせる
+  // ★ 出現ドロップ設定用チェックボックスの生成
+  const spawnSettingsEl = document.getElementById('spawn-settings');
+  const SPAWNABLE_COLORS = ALL_COLORS.filter(c => c !== 'unmatchable');
+
+  SPAWNABLE_COLORS.forEach(color => {
+    let label = document.createElement('label');
+    label.className = 'spawn-item';
+    
+    let cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = color;
+    if (BASE_COLORS.includes(color)) cb.checked = true;
+    
+    let icon = document.createElement('div');
+    icon.className = `mini-orb ${color}`;
+    
+    label.appendChild(cb);
+    label.appendChild(icon);
+    spawnSettingsEl.appendChild(label);
+    
+    // チェックボックス変更時の処理
+    cb.addEventListener('change', () => {
+      const cbs = document.querySelectorAll('#spawn-settings input:checked');
+      // 0個選択を防止
+      if (cbs.length === 0) {
+        cb.checked = true; 
+        return;
+      }
+      
+      activeSpawnColors = Array.from(cbs).map(input => input.value);
+      
+      // デフォルト6色かどうかを判定してボタン名を変える
+      const isDefault = activeSpawnColors.length === 6 && BASE_COLORS.every(c => activeSpawnColors.includes(c));
+      const btn = document.getElementById('new-board-btn');
+      if (isDefault) {
+        btn.innerHTML = '🆕 新しい盤面';
+        btn.style.backgroundColor = '#00aaff';
+      } else {
+        btn.innerHTML = '🆕 カスタム盤面';
+        btn.style.backgroundColor = '#aa00ff'; // カスタム時は色も少し変えて分かりやすく
+      }
+    });
+  });
+
+  const settingsModal = document.getElementById('settings-modal');
+  
+  document.getElementById('settings-btn').addEventListener('click', () => {
+    settingsModal.classList.add('active');
+  });
+  
+  document.getElementById('close-settings-btn').addEventListener('click', () => {
+    settingsModal.classList.remove('active');
+  });
+
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+      settingsModal.classList.remove('active');
+    }
+  });
+
+  document.getElementById('count-toggle').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      document.getElementById('drop-counts').classList.remove('hidden');
+      updateDropCounts(); 
+    } else {
+      document.getElementById('drop-counts').classList.add('hidden');
+    }
+  });
+
+  function updateDropCounts() {
+    if (!document.getElementById('count-toggle').checked) return;
+
+    const counts = {};
+    ALL_COLORS.forEach(c => counts[c] = 0);
+    
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (board[r][c]) {
+          let color = board[r][c].dataset.color;
+          if (counts[color] !== undefined) {
+            counts[color]++;
+          }
+        }
+      }
+    }
+    
+    const container = document.getElementById('drop-counts');
+    container.innerHTML = ''; 
+    
+    ALL_COLORS.forEach(color => {
+      if (color === 'unmatchable') return; 
+      
+      if (counts[color] > 0) {
+        let item = document.createElement('div');
+        item.className = 'count-item';
+        
+        let icon = document.createElement('div');
+        icon.className = `mini-orb ${color}`;
+        
+        let text = document.createElement('span');
+        text.innerText = `×${counts[color]}`;
+        
+        item.appendChild(icon);
+        item.appendChild(text);
+        container.appendChild(item);
+      }
+    });
+  }
+
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', (e) => {
       let newMode = e.target.dataset.mode;
       if (currentMode === newMode) return;
 
-      // 進行中のアニメーションを強制終了
       resolveId++;
       isResolving = false;
 
@@ -279,10 +462,10 @@
       currentMode = newMode;
       
       if (currentMode === 'puzzle') {
-        document.getElementById('puzzle-controls').classList.add('active');
+        document.getElementById('settings-btn').style.display = '';
         document.getElementById('edit-controls').classList.remove('active');
       } else {
-        document.getElementById('puzzle-controls').classList.remove('active');
+        document.getElementById('settings-btn').style.display = 'none';
         document.getElementById('edit-controls').classList.add('active');
       }
     });
@@ -370,8 +553,13 @@
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         let color;
+        let retries = 0;
         do {
-          color = BASE_COLORS[Math.floor(Math.random() * BASE_COLORS.length)];
+          // ★ 出現ドロップ設定で選ばれた色からランダムに取得
+          color = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
+          retries++;
+          // 選択色が2色以下の場合は最初から揃ってしまうことを許可して無限ループを防止
+          if (activeSpawnColors.length < 3 || retries > 20) break;
         } while (
           (r >= 2 && board[r-1][c]?.dataset.color === color && board[r-2][c]?.dataset.color === color) ||
           (c >= 2 && board[r][c-1]?.dataset.color === color && board[r][c-2]?.dataset.color === color)
@@ -387,6 +575,7 @@
       }
     }
     resetComboText();
+    updateDropCounts();
   }
 
   function restoreBoardState() {
@@ -409,6 +598,7 @@
       }
     }
     resetComboText();
+    updateDropCounts();
   }
 
   function resetComboText() {
@@ -592,6 +782,7 @@
         }
       }
     }
+    updateDropCounts();
   }
 
   function syncUnmatchableDisplay() {
@@ -614,7 +805,7 @@
   /* --- 連鎖処理 --- */
   async function resolveMatches() {
     resolveId++;
-    const currentResolveId = resolveId; // 実行時のIDを保存
+    const currentResolveId = resolveId; 
     isResolving = true;
     
     let isOchiconEnabled = document.getElementById('ochicon-toggle').checked;
@@ -656,22 +847,21 @@
         if (el) {
           el.classList.add('exploded'); 
           board[r][c] = null;
-          // 親ノードが存在するか確認してから削除（キャンセル時のエラー防止）
           setTimeout(() => { if(el && el.parentNode) el.remove(); }, 250);
           bombExplodedThisTurn = true;
         }
       });
       if (bombExplodedThisTurn) {
-        if (currentResolveId !== resolveId) return; // キャンセル確認
+        if (currentResolveId !== resolveId) return;
         await sleep(250);
-        if (currentResolveId !== resolveId) return; // キャンセル確認
+        if (currentResolveId !== resolveId) return;
       }
     }
 
     let matched = true;
 
     while (matched) {
-      if (currentResolveId !== resolveId) return; // ループ開始時にキャンセル確認
+      if (currentResolveId !== resolveId) return;
       
       let comboGroups = findComboGroups();
 
@@ -741,7 +931,6 @@
       await sleep(100); 
     }
     
-    // 自分の処理が最後まで完了した時のみロックを解除
     if (currentResolveId === resolveId) {
       isResolving = false;
     }
@@ -833,7 +1022,8 @@
       
       if (spawnNew) {
         for (let r = 0; r < emptyCount; r++) {
-          let newColor = BASE_COLORS[Math.floor(Math.random() * BASE_COLORS.length)];
+          // ★ 変更箇所: 落ちコンも「出現ドロップ設定」で選ばれた色からのみ降ってくる
+          let newColor = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
           let newEl = createOrbElement(newColor, r, c);
           
           newEl.style.top = `${((r - emptyCount) / ROWS) * 100}%`;
@@ -850,9 +1040,9 @@
     }
 
     if (moved) {
-      if (currentResolveId && currentResolveId !== resolveId) return; // キャンセル確認
+      if (currentResolveId && currentResolveId !== resolveId) return; 
       await sleep(fallTimeMs + 50);
-      if (currentResolveId && currentResolveId !== resolveId) return; // キャンセル確認
+      if (currentResolveId && currentResolveId !== resolveId) return; 
       board.forEach(row => row.forEach(el => el && el.classList.remove('falling')));
     }
   }
