@@ -134,12 +134,9 @@
   .palette-orb.selected { transform: scale(1.15); box-shadow: 0 0 0 3px #fff, 0 0 10px rgba(255, 255, 255, 0.8); }
   .palette-orb.unmatchable { background: #444; }
 
-  /* ★ 修正: 設定ボタン(top 9.5%〜14.5%)と盤面エリアの間に収まるように配置 */
   #combo-text {
     position: absolute; 
-    top: 16%; /* 設定メニューのすぐ下に配置 */
-    left: 0; width: 100%; 
-    height: 12%; /* 下のボタン群までの隙間をカバー */
+    top: 16%; left: 0; width: 100%; height: 12%; 
     display: flex; justify-content: center; align-items: center;
     font-size: 4vh; font-weight: bold; color: #ffd700; text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
     z-index: 5;
@@ -201,6 +198,34 @@
     transition: all 0.2s ease-out !important; transform: scale(1.5) !important; opacity: 0 !important; filter: brightness(2);
   }
 
+  /* ★ ルート描画SVGのスタイル */
+  #route-svg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 15; 
+  }
+  .route-line-bg {
+    fill: none;
+    stroke: rgba(0, 0, 0, 0.9); /* 黒い縁取り */
+    stroke-width: 0.24; 
+    stroke-linecap: round; 
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+  }
+  .route-line {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.95); /* 白線 */
+    stroke-width: 0.12; 
+    stroke-linecap: round; 
+    stroke-linejoin: round;
+  }
+  .route-marker-text {
+    font-size: 0.35px; /* マス目基準の文字サイズ */
+    font-family: sans-serif;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
+  }
+
   .red    { background: url('images/dp.png')   0%   0% / 500% 200% no-repeat; }
   .blue   { background: url('images/dp.png')  25%   0% / 500% 200% no-repeat; }
   .green  { background: url('images/dp.png')  50%   0% / 500% 200% no-repeat; }
@@ -232,8 +257,9 @@
 <div id="app-container">
   
   <div id="mode-tabs">
-    <div class="tab active" data-mode="puzzle">パズルモード</div>
-    <div class="tab" data-mode="edit">配置モード</div>
+    <div class="tab active" data-mode="puzzle">パズル</div>
+    <div class="tab" data-mode="edit">配置</div>
+    <div class="tab" data-mode="rearrange">組み換え</div>
   </div>
 
   <button id="settings-btn">⚙️ 設定メニュー</button>
@@ -255,7 +281,9 @@
     
     <div id="drop-counts"></div>
     
-    <div id="board"></div>
+    <div id="board">
+      <svg id="route-svg"></svg>
+    </div>
   </div>
 
   <div id="settings-modal">
@@ -272,17 +300,30 @@
       
       <div class="settings-subheader" style="margin-top: 0;">新しい盤面設定</div>
       <div id="spawn-settings" class="spawn-settings">
-        </div>
+      </div>
 
       <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
 
-      <label class="toggle-label">
-        <input type="checkbox" id="ochicon-toggle"> 落ちコンあり
-      </label>
+      <div style="display: flex; justify-content: space-around; width: 100%;">
+        <label class="toggle-label">
+          <input type="checkbox" id="ochicon-toggle"> 落ちコンあり
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="count-toggle" checked> ドロップ個数表示
+        </label>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
       
-      <label class="toggle-label">
-        <input type="checkbox" id="count-toggle" checked> ドロップ個数表示
-      </label>
+      <div style="display: flex; justify-content: center; align-items: center; gap: 2vw; width: 100%;">
+        <span style="font-size: 1.8vh; font-weight: bold; color: #ffd700;">〇個以下で消せない</span>
+        <label class="toggle-label">
+          <input type="checkbox" id="min-4-toggle"> 3
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="min-5-toggle"> 4
+        </label>
+      </div>
 
       <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
 
@@ -335,6 +376,10 @@
   let comboCount = 0;
   
   let resolveId = 0;
+  let minMatchCount = 3;
+
+  let dragRoute = [];
+  let routeAnimFrame = null;
 
   let isDragging = false;
   let draggedElement = null;
@@ -407,6 +452,192 @@
     }
   });
 
+  const min4Toggle = document.getElementById('min-4-toggle');
+  const min5Toggle = document.getElementById('min-5-toggle');
+
+  min4Toggle.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      min5Toggle.checked = false;
+      minMatchCount = 4;
+    } else {
+      minMatchCount = 3;
+    }
+  });
+
+  min5Toggle.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      min4Toggle.checked = false;
+      minMatchCount = 5;
+    } else {
+      minMatchCount = 3;
+    }
+  });
+
+  // ★ 角を丸めるための座標計算関数
+  function calcCurvePoints(prev, curr, next, radius) {
+    let dx1 = prev.x - curr.x;
+    let dy1 = prev.y - curr.y;
+    let len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
+    
+    let dx2 = next.x - curr.x;
+    let dy2 = next.y - curr.y;
+    let len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+    
+    let r = Math.min(radius, len1 / 2, len2 / 2);
+    if (r === 0) {
+      return { start: {x: curr.x, y: curr.y}, end: {x: curr.x, y: curr.y}, c: {x: curr.x, y: curr.y} };
+    }
+    return {
+      start: { x: curr.x + (dx1 / len1) * r, y: curr.y + (dy1 / len1) * r },
+      end:   { x: curr.x + (dx2 / len2) * r, y: curr.y + (dy2 / len2) * r },
+      c:     { x: curr.x, y: curr.y }
+    };
+  }
+
+  // ★ ルート描画関数（一本のパスとして描画・縁取り）
+  function drawRoute() {
+    const svg = document.getElementById('route-svg');
+    if (!svg) return;
+    svg.innerHTML = ''; 
+    
+    if (routeAnimFrame) {
+      cancelAnimationFrame(routeAnimFrame);
+      routeAnimFrame = null;
+    }
+    
+    // 動かさなかった場合（マスの履歴が1以下）は表示しない
+    if (currentMode !== 'rearrange' || dragRoute.length <= 1) return;
+
+    svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
+
+    let visitCount = {};
+    const offsetPatterns = [
+      {x: 0, y: 0}, {x: 0.12, y: -0.12}, {x: -0.12, y: 0.12},
+      {x: 0.12, y: 0.12}, {x: -0.12, y: -0.12}, {x: 0.16, y: 0},
+      {x: -0.16, y: 0}, {x: 0, y: 0.16}, {x: 0, y: -0.16}
+    ];
+
+    let renderPoints = dragRoute.map(p => {
+      let key = `${p.c},${p.r}`;
+      let count = visitCount[key] || 0;
+      visitCount[key] = count + 1;
+      let offset = offsetPatterns[count % offsetPatterns.length];
+      return { x: p.c + 0.5 + offset.x, y: p.r + 0.5 + offset.y };
+    });
+
+    // 1つの連続したパス（d属性）の文字列を作成
+    let d = "";
+    for(let i = 0; i < renderPoints.length; i++) {
+        if (i === 0) {
+            d += `M ${renderPoints[i].x} ${renderPoints[i].y} `;
+        } else if (i === renderPoints.length - 1) {
+            d += `L ${renderPoints[i].x} ${renderPoints[i].y} `;
+        } else {
+            let cp = calcCurvePoints(renderPoints[i-1], renderPoints[i], renderPoints[i+1], 0.2); // 半径0.2の緩やかなカーブ
+            // 現在の点に向かって直線を引く（角の手前まで）
+            d += `L ${cp.start.x} ${cp.start.y} `;
+            // 角を曲がる
+            d += `Q ${cp.c.x} ${cp.c.y} ${cp.end.x} ${cp.end.y} `;
+        }
+    }
+
+    // 背景（黒縁）
+    let bgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    bgPath.setAttribute('d', d);
+    bgPath.setAttribute('class', 'route-line-bg');
+    svg.appendChild(bgPath);
+    
+    // 前面（白線）
+    let fgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    fgPath.setAttribute('d', d);
+    fgPath.setAttribute('class', 'route-line');
+    svg.appendChild(fgPath);
+
+    // スタートマーカー (S / シアン)
+    let startP = renderPoints[0];
+    let startG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    let startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    startCircle.setAttribute('cx', startP.x);
+    startCircle.setAttribute('cy', startP.y);
+    startCircle.setAttribute('r', '0.35');
+    startCircle.setAttribute('fill', '#00e5ff'); // シアンに変更
+    startCircle.setAttribute('stroke', '#000');
+    startCircle.setAttribute('stroke-width', '0.05');
+    startCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
+    let startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    startText.setAttribute('x', startP.x);
+    startText.setAttribute('y', startP.y);
+    startText.setAttribute('dy', '0.12'); 
+    startText.setAttribute('text-anchor', 'middle');
+    startText.setAttribute('class', 'route-marker-text');
+    startText.setAttribute('fill', '#000');
+    startText.textContent = 'S';
+    startG.appendChild(startCircle);
+    startG.appendChild(startText);
+    svg.appendChild(startG);
+
+    // ゴールマーカー (F / 赤)
+    let endP = renderPoints[renderPoints.length - 1];
+    let endG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    let endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    endCircle.setAttribute('cx', endP.x);
+    endCircle.setAttribute('cy', endP.y);
+    endCircle.setAttribute('r', '0.35');
+    endCircle.setAttribute('fill', '#ff0033'); 
+    endCircle.setAttribute('stroke', '#000');
+    endCircle.setAttribute('stroke-width', '0.05');
+    endCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
+    let endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    endText.setAttribute('x', endP.x);
+    endText.setAttribute('y', endP.y);
+    endText.setAttribute('dy', '0.12');
+    endText.setAttribute('text-anchor', 'middle');
+    endText.setAttribute('class', 'route-marker-text');
+    endText.setAttribute('fill', '#fff');
+    endText.textContent = 'F';
+    endG.appendChild(endCircle);
+    endG.appendChild(endText);
+    svg.appendChild(endG);
+
+    // アニメーションガイドの光る丸
+    let animCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    animCircle.setAttribute('r', '0.15');
+    animCircle.setAttribute('fill', '#ffffff');
+    animCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
+    svg.appendChild(animCircle);
+
+    let totalLength = fgPath.getTotalLength();
+    let stepTime = 120; 
+    let totalTime = (renderPoints.length - 1) * stepTime;
+    let startTime = performance.now();
+    let waiting = false;
+
+    function animate(time) {
+      if (waiting) {
+        routeAnimFrame = requestAnimationFrame(animate);
+        return;
+      }
+      let elapsed = time - startTime;
+      if (elapsed >= totalTime) {
+        let lastP = renderPoints[renderPoints.length - 1];
+        animCircle.setAttribute('cx', lastP.x);
+        animCircle.setAttribute('cy', lastP.y);
+        waiting = true;
+        setTimeout(() => {
+          startTime = performance.now();
+          waiting = false;
+        }, 1000);
+      } else {
+        let progress = Math.max(0, Math.min(1, elapsed / totalTime));
+        let pt = fgPath.getPointAtLength(progress * totalLength);
+        animCircle.setAttribute('cx', pt.x);
+        animCircle.setAttribute('cy', pt.y);
+      }
+      routeAnimFrame = requestAnimationFrame(animate);
+    }
+    routeAnimFrame = requestAnimationFrame(animate);
+  }
+
   function updateDropCounts() {
     if (!document.getElementById('count-toggle').checked) return;
 
@@ -454,15 +685,23 @@
 
       resolveId++;
       isResolving = false;
+      
+      dragRoute = [];
+      drawRoute();
 
-      if (currentMode === 'edit' && newMode === 'puzzle') saveCurrentBoardState();
-      if (currentMode === 'puzzle' && newMode === 'edit') restoreBoardState();
+      if (newMode === 'rearrange' && currentMode === 'puzzle') {
+          saveCurrentBoardState();
+      } else if (currentMode === 'edit' && (newMode === 'puzzle' || newMode === 'rearrange')) {
+          saveCurrentBoardState();
+      } else if ((currentMode === 'puzzle' || currentMode === 'rearrange') && newMode === 'edit') {
+          restoreBoardState();
+      }
 
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
       currentMode = newMode;
       
-      if (currentMode === 'puzzle') {
+      if (currentMode === 'puzzle' || currentMode === 'rearrange') {
         document.getElementById('settings-btn').style.display = '';
         document.getElementById('edit-controls').classList.remove('active');
       } else {
@@ -476,6 +715,9 @@
     tab.addEventListener('click', (e) => {
       resolveId++;
       isResolving = false;
+      
+      dragRoute = [];
+      drawRoute();
 
       document.querySelectorAll('.size-tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
@@ -534,17 +776,29 @@
   document.getElementById('new-board-btn').addEventListener('click', () => {
     resolveId++;
     isResolving = false;
+    dragRoute = [];
+    drawRoute();
     createBoard();
   });
+  
   document.getElementById('reset-btn').addEventListener('click', () => {
     resolveId++;
     isResolving = false;
     restoreBoardState();
+    
+    dragRoute = [];
+    const svg = document.getElementById('route-svg');
+    if (svg) svg.innerHTML = '';
+    if (routeAnimFrame) {
+      cancelAnimationFrame(routeAnimFrame);
+      routeAnimFrame = null;
+    }
   });
 
   function createBoard() {
     const boardEl = document.getElementById('board');
-    boardEl.innerHTML = '';
+    boardEl.querySelectorAll('.orb').forEach(e => e.remove());
+    
     board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
     savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
     
@@ -579,7 +833,8 @@
 
   function restoreBoardState() {
     const boardEl = document.getElementById('board');
-    boardEl.innerHTML = '';
+    boardEl.querySelectorAll('.orb').forEach(e => e.remove());
+    
     board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
     
     unmatchableColors = new Set(savedUnmatchableColors);
@@ -661,7 +916,7 @@
     let { x, y } = getEventPos(e);
     let targetPos = getGridPos(x, y, false); 
 
-    if (currentMode === 'puzzle') {
+    if (currentMode === 'puzzle' || currentMode === 'rearrange') {
       if (!targetPos || !e.target.classList.contains('orb')) return;
       currentDragCell = targetPos;
       draggedElement = board[currentDragCell.r][currentDragCell.c];
@@ -670,6 +925,14 @@
       isDragging = true;
       boardEl.style.overflow = 'visible'; 
       document.getElementById('board-area').style.zIndex = '30';
+      
+      dragRoute = [{r: currentDragCell.r, c: currentDragCell.c}];
+      const svg = document.getElementById('route-svg');
+      if (svg) svg.innerHTML = '';
+      if (routeAnimFrame) {
+        cancelAnimationFrame(routeAnimFrame);
+        routeAnimFrame = null;
+      }
       
       draggedElement.classList.add('dragging');
       updateDragPosition(x, y);
@@ -695,7 +958,7 @@
     let { x, y } = getEventPos(e);
     let targetPos = getGridPos(x, y, true);
 
-    if (currentMode === 'puzzle' && isDragging) {
+    if ((currentMode === 'puzzle' || currentMode === 'rearrange') && isDragging) {
       updateDragPosition(x, y);
       if (targetPos && (targetPos.r !== currentDragCell.r || targetPos.c !== currentDragCell.c)) {
         let targetEl = board[targetPos.r][targetPos.c];
@@ -709,6 +972,13 @@
            targetEl.style.left = `${(currentDragCell.c / COLS) * 100}%`;
         }
         currentDragCell = targetPos;
+        
+        if (currentMode === 'rearrange') {
+          let lastObj = dragRoute[dragRoute.length - 1];
+          if (lastObj.r !== targetPos.r || lastObj.c !== targetPos.c) {
+            dragRoute.push({r: targetPos.r, c: targetPos.c});
+          }
+        }
       }
     } else if (currentMode === 'edit' && isPainting) {
       let exactTargetPos = getGridPos(x, y, false);
@@ -717,7 +987,7 @@
   }
 
   function handleInputEnd() {
-    if (currentMode === 'puzzle') {
+    if (currentMode === 'puzzle' || currentMode === 'rearrange') {
       if (!isDragging) return;
       isDragging = false;
       boardEl.style.overflow = 'hidden'; 
@@ -732,8 +1002,12 @@
       draggedElement = null;
       currentDragCell = null;
 
-      resetComboText();
-      resolveMatches(); 
+      if (currentMode === 'puzzle') {
+        resetComboText();
+        resolveMatches(); 
+      } else if (currentMode === 'rearrange') {
+        drawRoute();
+      }
 
     } else if (currentMode === 'edit') {
       isPainting = false;
@@ -931,7 +1205,12 @@
     }
     
     if (currentResolveId === resolveId) {
-      isResolving = false;
+      setTimeout(() => {
+        if (currentResolveId === resolveId) { 
+          restoreBoardState();
+          isResolving = false; 
+        }
+      }, 1000);
     }
   }
 
@@ -939,7 +1218,7 @@
     let removeFlags = Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
     
     for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS - 2; c++) {
+      for (let c = 0; c <= COLS - 3; c++) {
         let el = board[r][c];
         if (!el || el.dataset.unmatchable === 'true') continue;
         let color = el.dataset.color;
@@ -952,7 +1231,7 @@
     }
     
     for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < ROWS - 2; r++) {
+      for (let r = 0; r <= ROWS - 3; r++) {
         let el = board[r][c];
         if (!el || el.dataset.unmatchable === 'true') continue;
         let color = el.dataset.color;
@@ -990,7 +1269,9 @@
               }
             }
           }
-          groups.push(group);
+          if (group.length >= minMatchCount) {
+            groups.push(group);
+          }
         }
       }
     }
