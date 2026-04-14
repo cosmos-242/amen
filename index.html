@@ -147,17 +147,29 @@
     display: flex; flex-direction: column; gap: 0.8vh; z-index: 10; 
   }
 
-  #board-buttons {
+  /* ★ ボタンレイアウト修正 */
+  #board-buttons-wrapper {
+    display: flex; flex-direction: column; gap: 0.8vh; width: 100%; box-sizing: border-box;
+  }
+  #extra-buttons, #main-buttons {
     display: flex; justify-content: space-between; gap: 2vw; width: 100%; box-sizing: border-box;
   }
-  #board-buttons button {
+  #board-buttons-wrapper button {
     flex: 1; padding: 1.2vh 0; font-size: 2vh; font-weight: bold;
     color: #fff; border: none; border-radius: 6px; cursor: pointer;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; transition: background-color 0.2s, color 0.2s;
   }
-  #board-buttons button:active { transform: translateY(2px); box-shadow: none; }
+  #board-buttons-wrapper button:active { transform: translateY(2px); box-shadow: none; }
+  
   #new-board-btn { background-color: #00aaff; }
   #reset-btn { background-color: #e60088; }
+  #toggle-route-btn { background-color: #555; }
+  #reverse-route-btn { background-color: #555; }
+
+  /* ★ ルート保持時の色付きスタイル */
+  #toggle-route-btn.has-route { background-color: #00aaff; color: #fff; }
+  #toggle-route-btn.has-route.hidden-route { background-color: #555; color: #aaa; }
+  #reverse-route-btn.has-route { background-color: #ffd700; color: #000; }
 
   #drop-counts {
     display: flex; flex-wrap: wrap; justify-content: center; 
@@ -198,28 +210,25 @@
     transition: all 0.2s ease-out !important; transform: scale(1.5) !important; opacity: 0 !important; filter: brightness(2);
   }
 
-  /* ★ ルート描画SVGのスタイル */
   #route-svg {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     pointer-events: none; z-index: 15; 
   }
   .route-line-bg {
     fill: none;
-    stroke: rgba(0, 0, 0, 0.9); /* 黒い縁取り */
-    stroke-width: 0.24; 
-    stroke-linecap: round; 
+    stroke: rgba(0, 0, 0, 0.9);
+    stroke-width: 0.08; 
     stroke-linejoin: round;
     filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
   }
   .route-line {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.95); /* 白線 */
-    stroke-width: 0.12; 
-    stroke-linecap: round; 
+    stroke: rgba(255, 255, 255, 0.95);
+    stroke-width: 0.04; 
     stroke-linejoin: round;
   }
   .route-marker-text {
-    font-size: 0.35px; /* マス目基準の文字サイズ */
+    font-size: 0.2px; 
     font-family: sans-serif;
     font-weight: bold;
     pointer-events: none;
@@ -274,9 +283,16 @@
   <div id="combo-text"></div>
   
   <div id="board-area">
-    <div id="board-buttons">
-      <button id="new-board-btn">🆕 新しい盤面</button>
-      <button id="reset-btn">🔄 リセット</button>
+    
+    <div id="board-buttons-wrapper">
+      <div id="extra-buttons">
+        <button id="toggle-route-btn">ルート非表示</button>
+        <button id="reverse-route-btn">逆再現</button>
+      </div>
+      <div id="main-buttons">
+        <button id="new-board-btn">🆕 新しい盤面</button>
+        <button id="reset-btn">🔄 リセット</button>
+      </div>
     </div>
     
     <div id="drop-counts"></div>
@@ -380,12 +396,66 @@
 
   let dragRoute = [];
   let routeAnimFrame = null;
+  let isRouteVisible = true; 
+
+  // ★ 逆再現用の状態管理
+  let originalBoardColors = null; 
+  let isReversedState = false;
 
   let isDragging = false;
   let draggedElement = null;
   let currentDragCell = null;
   let isPainting = false;
   let paintUnmatchableTargetState = 'true'; 
+
+  // ★ ボタンのテキスト・表示状態・色を一括管理
+  function updateButtonLabels() {
+    const newBoardBtn = document.getElementById('new-board-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const toggleBtn = document.getElementById('toggle-route-btn');
+    const reverseBtn = document.getElementById('reverse-route-btn');
+    const extraButtons = document.getElementById('extra-buttons');
+    
+    toggleBtn.innerHTML = isRouteVisible ? 'ルート非表示' : 'ルート表示';
+
+    // 1. モード別のボタン表示切り替え
+    if (currentMode === 'edit') {
+      extraButtons.style.display = 'none'; // 配置モード: 全て非表示
+    } else if (currentMode === 'puzzle') {
+      extraButtons.style.display = 'flex';
+      toggleBtn.style.display = 'block';   // パズルモード: ルート非表示のみ
+      reverseBtn.style.display = 'none';
+    } else if (currentMode === 'rearrange') {
+      extraButtons.style.display = 'flex';
+      toggleBtn.style.display = 'block';   // 組み換えモード: 両方表示
+      reverseBtn.style.display = 'block';
+    }
+
+    // 2. モード別のテキスト設定
+    if (currentMode === 'rearrange') {
+      newBoardBtn.innerHTML = 'ルートリセット';
+      resetBtn.innerHTML = '盤面リセット';
+    } else {
+      const isDefault = activeSpawnColors.length === 6 && BASE_COLORS.every(c => activeSpawnColors.includes(c));
+      newBoardBtn.innerHTML = isDefault ? '🆕 新しい盤面' : '🆕 カスタム盤面';
+      resetBtn.innerHTML = '🔄 リセット';
+    }
+
+    // 3. ルート保持時の色付きスタイル管理
+    if (dragRoute.length > 1) {
+      toggleBtn.classList.add('has-route');
+      reverseBtn.classList.add('has-route');
+      if (!isRouteVisible) {
+        toggleBtn.classList.add('hidden-route');
+      } else {
+        toggleBtn.classList.remove('hidden-route');
+      }
+    } else {
+      toggleBtn.classList.remove('has-route');
+      toggleBtn.classList.remove('hidden-route');
+      reverseBtn.classList.remove('has-route');
+    }
+  }
 
   const spawnSettingsEl = document.getElementById('spawn-settings');
   const SPAWNABLE_COLORS = ALL_COLORS.filter(c => c !== 'unmatchable');
@@ -412,18 +482,8 @@
         cb.checked = true; 
         return;
       }
-      
       activeSpawnColors = Array.from(cbs).map(input => input.value);
-      
-      const isDefault = activeSpawnColors.length === 6 && BASE_COLORS.every(c => activeSpawnColors.includes(c));
-      const btn = document.getElementById('new-board-btn');
-      if (isDefault) {
-        btn.innerHTML = '🆕 新しい盤面';
-        btn.style.backgroundColor = '#00aaff';
-      } else {
-        btn.innerHTML = '🆕 カスタム盤面';
-        btn.style.backgroundColor = '#aa00ff'; 
-      }
+      updateButtonLabels();
     });
   });
 
@@ -473,7 +533,6 @@
     }
   });
 
-  // ★ 角を丸めるための座標計算関数
   function calcCurvePoints(prev, curr, next, radius) {
     let dx1 = prev.x - curr.x;
     let dy1 = prev.y - curr.y;
@@ -494,7 +553,6 @@
     };
   }
 
-  // ★ ルート描画関数（一本のパスとして描画・縁取り）
   function drawRoute() {
     const svg = document.getElementById('route-svg');
     if (!svg) return;
@@ -505,16 +563,15 @@
       routeAnimFrame = null;
     }
     
-    // 動かさなかった場合（マスの履歴が1以下）は表示しない
-    if (currentMode !== 'rearrange' || dragRoute.length <= 1) return;
+    if (dragRoute.length <= 1) return;
 
     svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
 
     let visitCount = {};
     const offsetPatterns = [
-      {x: 0, y: 0}, {x: 0.12, y: -0.12}, {x: -0.12, y: 0.12},
-      {x: 0.12, y: 0.12}, {x: -0.12, y: -0.12}, {x: 0.16, y: 0},
-      {x: -0.16, y: 0}, {x: 0, y: 0.16}, {x: 0, y: -0.16}
+      {x: 0, y: 0}, {x: 0.06, y: -0.06}, {x: -0.06, y: 0.06},
+      {x: 0.06, y: 0.06}, {x: -0.06, y: -0.06}, {x: 0.08, y: 0},
+      {x: -0.08, y: 0}, {x: 0, y: 0.08}, {x: 0, y: -0.08}
     ];
 
     let renderPoints = dragRoute.map(p => {
@@ -525,49 +582,69 @@
       return { x: p.c + 0.5 + offset.x, y: p.r + 0.5 + offset.y };
     });
 
-    // 1つの連続したパス（d属性）の文字列を作成
-    let d = "";
+    let fullD = "";
     for(let i = 0; i < renderPoints.length; i++) {
         if (i === 0) {
-            d += `M ${renderPoints[i].x} ${renderPoints[i].y} `;
+            fullD += `M ${renderPoints[i].x} ${renderPoints[i].y} `;
         } else if (i === renderPoints.length - 1) {
-            d += `L ${renderPoints[i].x} ${renderPoints[i].y} `;
+            fullD += `L ${renderPoints[i].x} ${renderPoints[i].y} `;
         } else {
-            let cp = calcCurvePoints(renderPoints[i-1], renderPoints[i], renderPoints[i+1], 0.2); // 半径0.2の緩やかなカーブ
-            // 現在の点に向かって直線を引く（角の手前まで）
-            d += `L ${cp.start.x} ${cp.start.y} `;
-            // 角を曲がる
-            d += `Q ${cp.c.x} ${cp.c.y} ${cp.end.x} ${cp.end.y} `;
+            let cp = calcCurvePoints(renderPoints[i-1], renderPoints[i], renderPoints[i+1], 0.2);
+            fullD += `L ${cp.start.x} ${cp.start.y} Q ${cp.c.x} ${cp.c.y} ${cp.end.x} ${cp.end.y} `;
+        }
+    }
+    let guidePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    guidePath.setAttribute('d', fullD);
+    guidePath.setAttribute('fill', 'none');
+    guidePath.setAttribute('stroke', 'none');
+    svg.appendChild(guidePath);
+
+    for (let i = 0; i < renderPoints.length; i++) {
+        let d = "";
+        if (i === 0) {
+            if (renderPoints.length > 1) {
+                let m0 = { x: (renderPoints[0].x + renderPoints[1].x)/2, y: (renderPoints[0].y + renderPoints[1].y)/2 };
+                d = `M ${renderPoints[0].x} ${renderPoints[0].y} L ${m0.x} ${m0.y}`;
+            }
+        } else if (i === renderPoints.length - 1) {
+            let mPrev = { x: (renderPoints[i-1].x + renderPoints[i].x)/2, y: (renderPoints[i-1].y + renderPoints[i].y)/2 };
+            d = `M ${mPrev.x} ${mPrev.y} L ${renderPoints[i].x} ${renderPoints[i].y}`;
+        } else {
+            let mPrev = { x: (renderPoints[i-1].x + renderPoints[i].x)/2, y: (renderPoints[i-1].y + renderPoints[i].y)/2 };
+            let mNext = { x: (renderPoints[i].x + renderPoints[i+1].x)/2, y: (renderPoints[i].y + renderPoints[i+1].y)/2 };
+            let cp = calcCurvePoints(renderPoints[i-1], renderPoints[i], renderPoints[i+1], 0.2);
+            d = `M ${mPrev.x} ${mPrev.y} L ${cp.start.x} ${cp.start.y} Q ${renderPoints[i].x} ${renderPoints[i].y} ${cp.end.x} ${cp.end.y} L ${mNext.x} ${mNext.y}`;
+        }
+
+        if (d) {
+            let bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            bg.setAttribute('d', d);
+            bg.setAttribute('class', 'route-line-bg');
+            bg.style.strokeLinecap = 'butt';
+            svg.appendChild(bg);
+
+            let fg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            fg.setAttribute('d', d);
+            fg.setAttribute('class', 'route-line');
+            fg.style.strokeLinecap = 'round';
+            svg.appendChild(fg);
         }
     }
 
-    // 背景（黒縁）
-    let bgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    bgPath.setAttribute('d', d);
-    bgPath.setAttribute('class', 'route-line-bg');
-    svg.appendChild(bgPath);
-    
-    // 前面（白線）
-    let fgPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    fgPath.setAttribute('d', d);
-    fgPath.setAttribute('class', 'route-line');
-    svg.appendChild(fgPath);
-
-    // スタートマーカー (S / シアン)
     let startP = renderPoints[0];
     let startG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     let startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     startCircle.setAttribute('cx', startP.x);
     startCircle.setAttribute('cy', startP.y);
-    startCircle.setAttribute('r', '0.35');
-    startCircle.setAttribute('fill', '#00e5ff'); // シアンに変更
+    startCircle.setAttribute('r', '0.18'); 
+    startCircle.setAttribute('fill', '#00e5ff'); 
     startCircle.setAttribute('stroke', '#000');
-    startCircle.setAttribute('stroke-width', '0.05');
+    startCircle.setAttribute('stroke-width', '0.04');
     startCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
     let startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     startText.setAttribute('x', startP.x);
     startText.setAttribute('y', startP.y);
-    startText.setAttribute('dy', '0.12'); 
+    startText.setAttribute('dy', '0.06'); 
     startText.setAttribute('text-anchor', 'middle');
     startText.setAttribute('class', 'route-marker-text');
     startText.setAttribute('fill', '#000');
@@ -576,37 +653,35 @@
     startG.appendChild(startText);
     svg.appendChild(startG);
 
-    // ゴールマーカー (F / 赤)
     let endP = renderPoints[renderPoints.length - 1];
     let endG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     let endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     endCircle.setAttribute('cx', endP.x);
     endCircle.setAttribute('cy', endP.y);
-    endCircle.setAttribute('r', '0.35');
+    endCircle.setAttribute('r', '0.18'); 
     endCircle.setAttribute('fill', '#ff0033'); 
     endCircle.setAttribute('stroke', '#000');
-    endCircle.setAttribute('stroke-width', '0.05');
+    endCircle.setAttribute('stroke-width', '0.04');
     endCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
     let endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     endText.setAttribute('x', endP.x);
     endText.setAttribute('y', endP.y);
-    endText.setAttribute('dy', '0.12');
+    endText.setAttribute('dy', '0.06'); 
     endText.setAttribute('text-anchor', 'middle');
     endText.setAttribute('class', 'route-marker-text');
     endText.setAttribute('fill', '#fff');
-    endText.textContent = 'F';
+    endText.textContent = 'E'; 
     endG.appendChild(endCircle);
     endG.appendChild(endText);
     svg.appendChild(endG);
 
-    // アニメーションガイドの光る丸
     let animCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    animCircle.setAttribute('r', '0.15');
+    animCircle.setAttribute('r', '0.06'); 
     animCircle.setAttribute('fill', '#ffffff');
     animCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
     svg.appendChild(animCircle);
 
-    let totalLength = fgPath.getTotalLength();
+    let totalLength = guidePath.getTotalLength();
     let stepTime = 120; 
     let totalTime = (renderPoints.length - 1) * stepTime;
     let startTime = performance.now();
@@ -629,7 +704,7 @@
         }, 1000);
       } else {
         let progress = Math.max(0, Math.min(1, elapsed / totalTime));
-        let pt = fgPath.getPointAtLength(progress * totalLength);
+        let pt = guidePath.getPointAtLength(progress * totalLength);
         animCircle.setAttribute('cx', pt.x);
         animCircle.setAttribute('cy', pt.y);
       }
@@ -686,9 +761,6 @@
       resolveId++;
       isResolving = false;
       
-      dragRoute = [];
-      drawRoute();
-
       if (newMode === 'rearrange' && currentMode === 'puzzle') {
           saveCurrentBoardState();
       } else if (currentMode === 'edit' && (newMode === 'puzzle' || newMode === 'rearrange')) {
@@ -701,6 +773,8 @@
       e.target.classList.add('active');
       currentMode = newMode;
       
+      updateButtonLabels(); // ボタン状態を更新
+
       if (currentMode === 'puzzle' || currentMode === 'rearrange') {
         document.getElementById('settings-btn').style.display = '';
         document.getElementById('edit-controls').classList.remove('active');
@@ -727,6 +801,7 @@
       document.documentElement.style.setProperty('--cols', COLS);
       document.documentElement.style.setProperty('--rows', ROWS);
       createBoard();
+      updateButtonLabels();
     });
   });
 
@@ -773,26 +848,92 @@
     document.documentElement.style.setProperty('--swap-speed', val + 's');
   });
 
+  // ★ 新しいボタンの挙動設定
+  
+  document.getElementById('toggle-route-btn').addEventListener('click', () => {
+    isRouteVisible = !isRouteVisible;
+    document.getElementById('route-svg').style.display = isRouteVisible ? 'block' : 'none';
+    updateButtonLabels();
+  });
+
+  // ルート通りに移動した場合の盤面をシミュレーションして返す関数
+  function computeBoardAfterRoute(startColors, route) {
+    let result = startColors.map(row => [...row]);
+    if (route.length <= 1) return result;
+    
+    let currPos = route[0];
+    let draggedColor = result[currPos.r][currPos.c];
+    
+    for (let i = 1; i < route.length; i++) {
+      let nextPos = route[i];
+      result[currPos.r][currPos.c] = result[nextPos.r][nextPos.c];
+      currPos = nextPos;
+    }
+    result[currPos.r][currPos.c] = draggedColor;
+    return result;
+  }
+
+  document.getElementById('reverse-route-btn').addEventListener('click', () => {
+    if (dragRoute.length <= 1) return;
+    
+    isReversedState = !isReversedState;
+    
+    if (isReversedState) {
+        // 通常状態 -> 逆状態への遷移
+        // 最初の状態を記憶
+        originalBoardColors = Array.from({length: ROWS}, (_, r) => [...savedBoardColors[r]]);
+        // パズル終了時の状態を計算
+        let postBoard = computeBoardAfterRoute(savedBoardColors, dragRoute);
+        // ルートの逆転（SとEが入れ替わる）
+        dragRoute.reverse();
+        
+        // パズル終了時の状態を新しい初期状態（アンカー）としてセット
+        for(let r = 0; r < ROWS; r++){
+            for(let c = 0; c < COLS; c++){
+                savedBoardColors[r][c] = postBoard[r][c];
+            }
+        }
+    } else {
+        // 逆状態 -> 通常状態への遷移
+        dragRoute.reverse();
+        // 記憶しておいた本当の初期盤面に戻す
+        if (originalBoardColors) {
+            for(let r = 0; r < ROWS; r++){
+                for(let c = 0; c < COLS; c++){
+                    savedBoardColors[r][c] = originalBoardColors[r][c];
+                }
+            }
+        }
+    }
+    
+    restoreBoardState(); // 盤面を更新
+    drawRoute();         // ルートを再描画
+  });
+
   document.getElementById('new-board-btn').addEventListener('click', () => {
-    resolveId++;
-    isResolving = false;
-    dragRoute = [];
-    drawRoute();
-    createBoard();
+    if (currentMode === 'rearrange') {
+      // ルートのみリセット
+      isReversedState = false;
+      originalBoardColors = null;
+      dragRoute = [];
+      drawRoute();
+      updateButtonLabels();
+    } else {
+      resolveId++;
+      isResolving = false;
+      isReversedState = false;
+      originalBoardColors = null;
+      dragRoute = [];
+      drawRoute();
+      createBoard();
+      updateButtonLabels();
+    }
   });
   
   document.getElementById('reset-btn').addEventListener('click', () => {
     resolveId++;
     isResolving = false;
-    restoreBoardState();
-    
-    dragRoute = [];
-    const svg = document.getElementById('route-svg');
-    if (svg) svg.innerHTML = '';
-    if (routeAnimFrame) {
-      cancelAnimationFrame(routeAnimFrame);
-      routeAnimFrame = null;
-    }
+    restoreBoardState(); // 盤面だけ戻す（ルートは消えない）
   });
 
   function createBoard() {
@@ -922,16 +1063,25 @@
       draggedElement = board[currentDragCell.r][currentDragCell.c];
       if (!draggedElement) return;
 
+      // ★ ルートが存在する場合、組み換えモードでのドラッグ（上書き）をブロック
+      if (currentMode === 'rearrange' && dragRoute.length > 1) {
+        draggedElement = null;
+        currentDragCell = null;
+        return; 
+      }
+
       isDragging = true;
       boardEl.style.overflow = 'visible'; 
       document.getElementById('board-area').style.zIndex = '30';
       
-      dragRoute = [{r: currentDragCell.r, c: currentDragCell.c}];
-      const svg = document.getElementById('route-svg');
-      if (svg) svg.innerHTML = '';
-      if (routeAnimFrame) {
-        cancelAnimationFrame(routeAnimFrame);
-        routeAnimFrame = null;
+      if (currentMode === 'rearrange' && dragRoute.length <= 1) {
+        dragRoute = [{r: currentDragCell.r, c: currentDragCell.c}];
+        const svg = document.getElementById('route-svg');
+        if (svg) svg.innerHTML = '';
+        if (routeAnimFrame) {
+          cancelAnimationFrame(routeAnimFrame);
+          routeAnimFrame = null;
+        }
       }
       
       draggedElement.classList.add('dragging');
@@ -976,7 +1126,13 @@
         if (currentMode === 'rearrange') {
           let lastObj = dragRoute[dragRoute.length - 1];
           if (lastObj.r !== targetPos.r || lastObj.c !== targetPos.c) {
-            dragRoute.push({r: targetPos.r, c: targetPos.c});
+            if (dragRoute.length >= 2 && 
+                dragRoute[dragRoute.length - 2].r === targetPos.r && 
+                dragRoute[dragRoute.length - 2].c === targetPos.c) {
+              dragRoute.pop();
+            } else {
+              dragRoute.push({r: targetPos.r, c: targetPos.c});
+            }
           }
         }
       }
@@ -1007,6 +1163,7 @@
         resolveMatches(); 
       } else if (currentMode === 'rearrange') {
         drawRoute();
+        updateButtonLabels(); // ルート作成後にボタン色を反映
       }
 
     } else if (currentMode === 'edit') {
@@ -1331,6 +1488,7 @@
   }
 
   createBoard();
+  updateButtonLabels(); // 初期化時にボタン状態をセット
 </script>
 </body>
 </html>
