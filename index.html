@@ -147,29 +147,30 @@
     display: flex; flex-direction: column; gap: 0.8vh; z-index: 10; 
   }
 
-  /* ★ ボタンレイアウト修正 */
+  /* ★ 新しいボタンレイアウト */
   #board-buttons-wrapper {
     display: flex; flex-direction: column; gap: 0.8vh; width: 100%; box-sizing: border-box;
   }
-  #extra-buttons, #main-buttons {
+  .btn-row {
     display: flex; justify-content: space-between; gap: 2vw; width: 100%; box-sizing: border-box;
   }
-  #board-buttons-wrapper button {
-    flex: 1; padding: 1.2vh 0; font-size: 2vh; font-weight: bold;
+  .btn-row button {
+    flex: 1; padding: 1.2vh 0; font-size: 1.8vh; font-weight: bold;
     color: #fff; border: none; border-radius: 6px; cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.4); white-space: nowrap; transition: background-color 0.2s, color 0.2s;
   }
-  #board-buttons-wrapper button:active { transform: translateY(2px); box-shadow: none; }
+  .btn-row button:active { transform: translateY(2px); box-shadow: none; }
   
   #new-board-btn { background-color: #00aaff; }
   #reset-btn { background-color: #e60088; }
   #toggle-route-btn { background-color: #555; }
   #reverse-route-btn { background-color: #555; }
+  #autoplay-btn { background-color: #555; } 
 
-  /* ★ ルート保持時の色付きスタイル */
   #toggle-route-btn.has-route { background-color: #00aaff; color: #fff; }
   #toggle-route-btn.has-route.hidden-route { background-color: #555; color: #aaa; }
   #reverse-route-btn.has-route { background-color: #ffd700; color: #000; }
+  #autoplay-btn.has-route { background-color: #32cd32; color: #fff; } 
 
   #drop-counts {
     display: flex; flex-wrap: wrap; justify-content: center; 
@@ -217,18 +218,15 @@
   .route-line-bg {
     fill: none;
     stroke: rgba(0, 0, 0, 0.9);
-    stroke-width: 0.08; 
     stroke-linejoin: round;
     filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
   }
   .route-line {
     fill: none;
     stroke: rgba(255, 255, 255, 0.95);
-    stroke-width: 0.04; 
     stroke-linejoin: round;
   }
   .route-marker-text {
-    font-size: 0.2px; 
     font-family: sans-serif;
     font-weight: bold;
     pointer-events: none;
@@ -285,11 +283,14 @@
   <div id="board-area">
     
     <div id="board-buttons-wrapper">
-      <div id="extra-buttons">
+      <div class="btn-row" id="row-autoplay">
+        <button id="autoplay-btn">▶ 自動再生</button> 
+      </div>
+      <div class="btn-row" id="row-reverse">
         <button id="toggle-route-btn">ルート非表示</button>
         <button id="reverse-route-btn">逆再現</button>
       </div>
-      <div id="main-buttons">
+      <div class="btn-row" id="row-main">
         <button id="new-board-btn">🆕 新しい盤面</button>
         <button id="reset-btn">🔄 リセット</button>
       </div>
@@ -356,6 +357,16 @@
         <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
       </div>
       
+      <div class="control-row">
+        <label>自動再生速度: <span id="autoplay-speed-display">0.15</span>s</label>
+        <input type="range" id="autoplay-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
+      </div>
+
+      <div class="control-row">
+        <label>ルートの太さ: <span id="route-width-display">0.04</span></label>
+        <input type="range" id="route-width-slider" min="0.01" max="0.1" step="0.01" value="0.04">
+      </div>
+      
       <button id="close-settings-btn" class="close-btn">閉じる</button>
     </div>
   </div>
@@ -397,8 +408,8 @@
   let dragRoute = [];
   let routeAnimFrame = null;
   let isRouteVisible = true; 
+  let routeWidthBase = 0.04; 
 
-  // ★ 逆再現用の状態管理
   let originalBoardColors = null; 
   let isReversedState = false;
 
@@ -408,30 +419,34 @@
   let isPainting = false;
   let paintUnmatchableTargetState = 'true'; 
 
-  // ★ ボタンのテキスト・表示状態・色を一括管理
   function updateButtonLabels() {
     const newBoardBtn = document.getElementById('new-board-btn');
     const resetBtn = document.getElementById('reset-btn');
     const toggleBtn = document.getElementById('toggle-route-btn');
     const reverseBtn = document.getElementById('reverse-route-btn');
-    const extraButtons = document.getElementById('extra-buttons');
+    const autoplayBtn = document.getElementById('autoplay-btn'); 
+
+    const rowAutoplay = document.getElementById('row-autoplay');
+    const rowReverse = document.getElementById('row-reverse');
     
     toggleBtn.innerHTML = isRouteVisible ? 'ルート非表示' : 'ルート表示';
 
-    // 1. モード別のボタン表示切り替え
+    // モードに合わせてボタン行の表示・非表示を切り替え
     if (currentMode === 'edit') {
-      extraButtons.style.display = 'none'; // 配置モード: 全て非表示
+      rowAutoplay.style.display = 'none'; 
+      rowReverse.style.display = 'none';
     } else if (currentMode === 'puzzle') {
-      extraButtons.style.display = 'flex';
-      toggleBtn.style.display = 'block';   // パズルモード: ルート非表示のみ
-      reverseBtn.style.display = 'none';
+      rowAutoplay.style.display = 'none'; 
+      rowReverse.style.display = 'flex';
+      toggleBtn.style.display = 'block';   
+      reverseBtn.style.display = 'none'; // パズルモードでは逆再現は非表示
     } else if (currentMode === 'rearrange') {
-      extraButtons.style.display = 'flex';
-      toggleBtn.style.display = 'block';   // 組み換えモード: 両方表示
+      rowAutoplay.style.display = 'flex';
+      rowReverse.style.display = 'flex';
+      toggleBtn.style.display = 'block';   
       reverseBtn.style.display = 'block';
     }
 
-    // 2. モード別のテキスト設定
     if (currentMode === 'rearrange') {
       newBoardBtn.innerHTML = 'ルートリセット';
       resetBtn.innerHTML = '盤面リセット';
@@ -441,10 +456,10 @@
       resetBtn.innerHTML = '🔄 リセット';
     }
 
-    // 3. ルート保持時の色付きスタイル管理
     if (dragRoute.length > 1) {
       toggleBtn.classList.add('has-route');
       reverseBtn.classList.add('has-route');
+      autoplayBtn.classList.add('has-route'); 
       if (!isRouteVisible) {
         toggleBtn.classList.add('hidden-route');
       } else {
@@ -454,6 +469,7 @@
       toggleBtn.classList.remove('has-route');
       toggleBtn.classList.remove('hidden-route');
       reverseBtn.classList.remove('has-route');
+      autoplayBtn.classList.remove('has-route');
     }
   }
 
@@ -599,6 +615,13 @@
     guidePath.setAttribute('stroke', 'none');
     svg.appendChild(guidePath);
 
+    let bgWidth = routeWidthBase * 2;
+    let fgWidth = routeWidthBase;
+    let markerRadius = routeWidthBase * 3 + 0.06;
+    let textFontSize = routeWidthBase * 3.5 + 0.06;
+    let textDy = routeWidthBase * 1.5;
+    let animRadius = Math.max(0.03, routeWidthBase * 1.5);
+
     for (let i = 0; i < renderPoints.length; i++) {
         let d = "";
         if (i === 0) {
@@ -620,12 +643,14 @@
             let bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             bg.setAttribute('d', d);
             bg.setAttribute('class', 'route-line-bg');
+            bg.setAttribute('stroke-width', bgWidth);
             bg.style.strokeLinecap = 'butt';
             svg.appendChild(bg);
 
             let fg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             fg.setAttribute('d', d);
             fg.setAttribute('class', 'route-line');
+            fg.setAttribute('stroke-width', fgWidth);
             fg.style.strokeLinecap = 'round';
             svg.appendChild(fg);
         }
@@ -636,7 +661,7 @@
     let startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     startCircle.setAttribute('cx', startP.x);
     startCircle.setAttribute('cy', startP.y);
-    startCircle.setAttribute('r', '0.18'); 
+    startCircle.setAttribute('r', markerRadius); 
     startCircle.setAttribute('fill', '#00e5ff'); 
     startCircle.setAttribute('stroke', '#000');
     startCircle.setAttribute('stroke-width', '0.04');
@@ -644,7 +669,8 @@
     let startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     startText.setAttribute('x', startP.x);
     startText.setAttribute('y', startP.y);
-    startText.setAttribute('dy', '0.06'); 
+    startText.setAttribute('dy', textDy); 
+    startText.setAttribute('font-size', textFontSize);
     startText.setAttribute('text-anchor', 'middle');
     startText.setAttribute('class', 'route-marker-text');
     startText.setAttribute('fill', '#000');
@@ -658,7 +684,7 @@
     let endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     endCircle.setAttribute('cx', endP.x);
     endCircle.setAttribute('cy', endP.y);
-    endCircle.setAttribute('r', '0.18'); 
+    endCircle.setAttribute('r', markerRadius); 
     endCircle.setAttribute('fill', '#ff0033'); 
     endCircle.setAttribute('stroke', '#000');
     endCircle.setAttribute('stroke-width', '0.04');
@@ -666,7 +692,8 @@
     let endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     endText.setAttribute('x', endP.x);
     endText.setAttribute('y', endP.y);
-    endText.setAttribute('dy', '0.06'); 
+    endText.setAttribute('dy', textDy); 
+    endText.setAttribute('font-size', textFontSize);
     endText.setAttribute('text-anchor', 'middle');
     endText.setAttribute('class', 'route-marker-text');
     endText.setAttribute('fill', '#fff');
@@ -676,7 +703,7 @@
     svg.appendChild(endG);
 
     let animCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    animCircle.setAttribute('r', '0.06'); 
+    animCircle.setAttribute('r', animRadius); 
     animCircle.setAttribute('fill', '#ffffff');
     animCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
     svg.appendChild(animCircle);
@@ -684,7 +711,7 @@
     let totalLength = guidePath.getTotalLength();
     let stepTime = 120; 
     let totalTime = (renderPoints.length - 1) * stepTime;
-    let startTime = performance.now();
+    let animStartTime = null; // ★ 修正：安全な初期化
     let waiting = false;
 
     function animate(time) {
@@ -692,14 +719,16 @@
         routeAnimFrame = requestAnimationFrame(animate);
         return;
       }
-      let elapsed = time - startTime;
+      if (animStartTime === null) animStartTime = time; // ★ 修正
+      let elapsed = Math.max(0, time - animStartTime);
+      
       if (elapsed >= totalTime) {
         let lastP = renderPoints[renderPoints.length - 1];
         animCircle.setAttribute('cx', lastP.x);
         animCircle.setAttribute('cy', lastP.y);
         waiting = true;
         setTimeout(() => {
-          startTime = performance.now();
+          animStartTime = null; // リセット
           waiting = false;
         }, 1000);
       } else {
@@ -766,14 +795,14 @@
       } else if (currentMode === 'edit' && (newMode === 'puzzle' || newMode === 'rearrange')) {
           saveCurrentBoardState();
       } else if ((currentMode === 'puzzle' || currentMode === 'rearrange') && newMode === 'edit') {
-          restoreBoardState();
+          restoreBoardState(true); // コンボは維持
       }
 
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       e.target.classList.add('active');
       currentMode = newMode;
       
-      updateButtonLabels(); // ボタン状態を更新
+      updateButtonLabels(); 
 
       if (currentMode === 'puzzle' || currentMode === 'rearrange') {
         document.getElementById('settings-btn').style.display = '';
@@ -847,16 +876,25 @@
     document.getElementById('swap-speed-display').innerText = val;
     document.documentElement.style.setProperty('--swap-speed', val + 's');
   });
-
-  // ★ 新しいボタンの挙動設定
   
+  document.getElementById('autoplay-speed-slider').addEventListener('input', (e) => {
+    let val = parseFloat(e.target.value).toFixed(2);
+    document.getElementById('autoplay-speed-display').innerText = val;
+  });
+
+  document.getElementById('route-width-slider').addEventListener('input', (e) => {
+    let val = parseFloat(e.target.value).toFixed(2);
+    document.getElementById('route-width-display').innerText = val;
+    routeWidthBase = parseFloat(val);
+    drawRoute();
+  });
+
   document.getElementById('toggle-route-btn').addEventListener('click', () => {
     isRouteVisible = !isRouteVisible;
     document.getElementById('route-svg').style.display = isRouteVisible ? 'block' : 'none';
     updateButtonLabels();
   });
 
-  // ルート通りに移動した場合の盤面をシミュレーションして返す関数
   function computeBoardAfterRoute(startColors, route) {
     let result = startColors.map(row => [...row]);
     if (route.length <= 1) return result;
@@ -874,29 +912,22 @@
   }
 
   document.getElementById('reverse-route-btn').addEventListener('click', () => {
-    if (dragRoute.length <= 1) return;
+    if (dragRoute.length <= 1 || isResolving) return; // ★ 修正：処理中はブロック
     
     isReversedState = !isReversedState;
     
     if (isReversedState) {
-        // 通常状態 -> 逆状態への遷移
-        // 最初の状態を記憶
         originalBoardColors = Array.from({length: ROWS}, (_, r) => [...savedBoardColors[r]]);
-        // パズル終了時の状態を計算
         let postBoard = computeBoardAfterRoute(savedBoardColors, dragRoute);
-        // ルートの逆転（SとEが入れ替わる）
         dragRoute.reverse();
         
-        // パズル終了時の状態を新しい初期状態（アンカー）としてセット
         for(let r = 0; r < ROWS; r++){
             for(let c = 0; c < COLS; c++){
                 savedBoardColors[r][c] = postBoard[r][c];
             }
         }
     } else {
-        // 逆状態 -> 通常状態への遷移
         dragRoute.reverse();
-        // 記憶しておいた本当の初期盤面に戻す
         if (originalBoardColors) {
             for(let r = 0; r < ROWS; r++){
                 for(let c = 0; c < COLS; c++){
@@ -906,13 +937,133 @@
         }
     }
     
-    restoreBoardState(); // 盤面を更新
-    drawRoute();         // ルートを再描画
+    restoreBoardState(true); 
+    drawRoute();         
+  });
+
+  // ★ 修正：自動再生の安定化（時間計算を完全に安全化）
+  document.getElementById('autoplay-btn').addEventListener('click', () => {
+    if (dragRoute.length <= 1 || isResolving) return;
+    
+    resolveId++; // 念のため他の予約処理をキャンセル
+    isResolving = true; 
+    
+    if (isReversedState && originalBoardColors) {
+        for(let r = 0; r < ROWS; r++){
+            for(let c = 0; c < COLS; c++){
+                savedBoardColors[r][c] = originalBoardColors[r][c];
+            }
+        }
+        isReversedState = false;
+        dragRoute.reverse();
+    }
+
+    restoreBoardState(true);
+    
+    if (!isRouteVisible) {
+      isRouteVisible = true;
+      document.getElementById('route-svg').style.display = 'block';
+      updateButtonLabels();
+    }
+    
+    let route = dragRoute;
+    let startPos = route[0];
+    let movingOrb = board[startPos.r][startPos.c];
+    
+    if(!movingOrb) {
+        isResolving = false;
+        return;
+    }
+
+    movingOrb.classList.add('dragging');
+    movingOrb.style.transition = 'none'; 
+    
+    let speedMs = parseFloat(document.getElementById('autoplay-speed-slider').value) * 1000;
+    let totalTime = (route.length - 1) * speedMs;
+    let autoPlayStartTime = null;
+    let lastIndex = 0;
+
+    function autoPlayStep(time) {
+      if (!isResolving) {
+          movingOrb.style.transition = '';
+          movingOrb.classList.remove('dragging');
+          return;
+      }
+      
+      if (autoPlayStartTime === null) autoPlayStartTime = time;
+      
+      // timeがマイナスにならないよう安全対策
+      let elapsed = Math.max(0, time - autoPlayStartTime);
+      let progress = totalTime > 0 ? Math.min(1, elapsed / totalTime) : 1;
+
+      let floatIndex = progress * (route.length - 1);
+      let currentIndex = Math.floor(floatIndex);
+      
+      if (currentIndex >= route.length - 1 && progress === 1) {
+          currentIndex = route.length - 2;
+      }
+      let nextIndex = currentIndex + 1;
+      let fraction = floatIndex - currentIndex;
+
+      let p1 = route[currentIndex];
+      let p2 = route[nextIndex];
+      let currentR = p1.r + (p2.r - p1.r) * fraction;
+      let currentC = p1.c + (p2.c - p1.c) * fraction;
+
+      movingOrb.style.top = `${(currentR / ROWS) * 100}%`;
+      movingOrb.style.left = `${(currentC / COLS) * 100}%`;
+
+      while (lastIndex < currentIndex) {
+          lastIndex++;
+          let prevPos = route[lastIndex - 1];
+          let curPos = route[lastIndex];
+          
+          let targetEl = board[curPos.r][curPos.c];
+          
+          board[prevPos.r][prevPos.c] = targetEl;
+          board[curPos.r][curPos.c] = movingOrb;
+          
+          if (targetEl) {
+             targetEl.dataset.r = prevPos.r;
+             targetEl.dataset.c = prevPos.c;
+             targetEl.style.top = `${(prevPos.r / ROWS) * 100}%`;
+             targetEl.style.left = `${(prevPos.c / COLS) * 100}%`;
+          }
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(autoPlayStep);
+      } else {
+        while (lastIndex < route.length - 1) {
+            lastIndex++;
+            let prevPos = route[lastIndex - 1];
+            let curPos = route[lastIndex];
+            let targetEl = board[curPos.r][curPos.c];
+            board[prevPos.r][prevPos.c] = targetEl;
+            board[curPos.r][curPos.c] = movingOrb;
+            if (targetEl) {
+               targetEl.dataset.r = prevPos.r;
+               targetEl.dataset.c = prevPos.c;
+               targetEl.style.top = `${(prevPos.r / ROWS) * 100}%`;
+               targetEl.style.left = `${(prevPos.c / COLS) * 100}%`;
+            }
+        }
+
+        movingOrb.classList.remove('dragging');
+        movingOrb.style.transition = '';
+        movingOrb.dataset.r = route[route.length-1].r;
+        movingOrb.dataset.c = route[route.length-1].c;
+        
+        resetComboText();
+        resolveMatches(); 
+      }
+    }
+    requestAnimationFrame(autoPlayStep);
   });
 
   document.getElementById('new-board-btn').addEventListener('click', () => {
     if (currentMode === 'rearrange') {
-      // ルートのみリセット
+      if (isResolving) return; // ★ 修正：処理中はブロック
       isReversedState = false;
       originalBoardColors = null;
       dragRoute = [];
@@ -931,9 +1082,9 @@
   });
   
   document.getElementById('reset-btn').addEventListener('click', () => {
-    resolveId++;
+    resolveId++; // 自動再生や連鎖などの処理を強制キャンセル
     isResolving = false;
-    restoreBoardState(); // 盤面だけ戻す（ルートは消えない）
+    restoreBoardState(true); 
   });
 
   function createBoard() {
@@ -972,7 +1123,7 @@
     updateDropCounts();
   }
 
-  function restoreBoardState() {
+  function restoreBoardState(keepCombo = false) {
     const boardEl = document.getElementById('board');
     boardEl.querySelectorAll('.orb').forEach(e => e.remove());
     
@@ -992,7 +1143,9 @@
         }
       }
     }
-    resetComboText();
+    if (!keepCombo) {
+        resetComboText();
+    }
     updateDropCounts();
   }
 
@@ -1063,7 +1216,6 @@
       draggedElement = board[currentDragCell.r][currentDragCell.c];
       if (!draggedElement) return;
 
-      // ★ ルートが存在する場合、組み換えモードでのドラッグ（上書き）をブロック
       if (currentMode === 'rearrange' && dragRoute.length > 1) {
         draggedElement = null;
         currentDragCell = null;
@@ -1071,6 +1223,11 @@
       }
 
       isDragging = true;
+
+      if (currentMode === 'puzzle') {
+          resetComboText();
+      }
+
       boardEl.style.overflow = 'visible'; 
       document.getElementById('board-area').style.zIndex = '30';
       
@@ -1159,11 +1316,10 @@
       currentDragCell = null;
 
       if (currentMode === 'puzzle') {
-        resetComboText();
         resolveMatches(); 
       } else if (currentMode === 'rearrange') {
         drawRoute();
-        updateButtonLabels(); // ルート作成後にボタン色を反映
+        updateButtonLabels(); 
       }
 
     } else if (currentMode === 'edit') {
@@ -1364,7 +1520,7 @@
     if (currentResolveId === resolveId) {
       setTimeout(() => {
         if (currentResolveId === resolveId) { 
-          restoreBoardState();
+          restoreBoardState(true);
           isResolving = false; 
         }
       }, 1000);
@@ -1488,7 +1644,7 @@
   }
 
   createBoard();
-  updateButtonLabels(); // 初期化時にボタン状態をセット
+  updateButtonLabels(); 
 </script>
 </body>
 </html>
