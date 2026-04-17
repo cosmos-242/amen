@@ -423,6 +423,10 @@
             background-color: #555;
         }
 
+        #mirror-btn {
+            background-color: #555;
+        }
+
         #toggle-route-btn.has-route {
             background-color: #00aaff;
             color: #fff;
@@ -525,6 +529,7 @@
             filter: brightness(2);
         }
 
+        #route-canvas,
         #route-svg {
             position: absolute;
             top: 0;
@@ -544,7 +549,6 @@
 
         .route-line {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.95);
             stroke-linejoin: round;
         }
 
@@ -660,6 +664,7 @@
 
             <div id="board-buttons-wrapper">
                 <div class="btn-row" id="row-autoplay">
+                    <button id="mirror-btn">↔ 左右入れ替え</button>
                     <button id="autoplay-btn">▶ 自動再生</button>
                 </div>
                 <div class="btn-row" id="row-reverse">
@@ -675,6 +680,7 @@
             <div id="drop-counts"></div>
 
             <div id="board">
+                <canvas id="route-canvas"></canvas>
                 <svg id="route-svg"></svg>
             </div>
         </div>
@@ -783,8 +789,11 @@
 
         let dragRoute = [];
         let routeAnimFrame = null;
+        let routeAnimTimeout = null;
+        let routeDrawToken = 0;
         let isRouteVisible = true;
         let routeWidthBase = 0.04;
+        let routeRenderMode = 'canvas'; // 'canvas' | 'svg'
 
         let originalBoardColors = null;
         let isReversedState = false;
@@ -794,6 +803,13 @@
         let currentDragCell = null;
         let isPainting = false;
         let paintUnmatchableTargetState = 'true';
+        let lastPaintCellKey = '';
+        let cachedBoardRect = null;
+        let cachedCellW = 0;
+        let cachedCellH = 0;
+        const dropCountElements = {};
+        let dropCountsQueued = false;
+        const orbPool = [];
 
         function updateButtonLabels() {
             const newBoardBtn = document.getElementById('new-board-btn');
@@ -944,17 +960,104 @@
             };
         }
 
+        function lerpColor(hex1, hex2, t) {
+            const a = hex1.replace('#', '');
+            const b = hex2.replace('#', '');
+            const r1 = parseInt(a.substring(0, 2), 16);
+            const g1 = parseInt(a.substring(2, 4), 16);
+            const b1 = parseInt(a.substring(4, 6), 16);
+            const r2 = parseInt(b.substring(0, 2), 16);
+            const g2 = parseInt(b.substring(2, 4), 16);
+            const b2 = parseInt(b.substring(4, 6), 16);
+
+            const r = Math.round(r1 + (r2 - r1) * t);
+            const g = Math.round(g1 + (g2 - g1) * t);
+            const bVal = Math.round(b1 + (b2 - b1) * t);
+            return `rgb(${r}, ${g}, ${bVal})`;
+        }
+
+        function getRouteGradientColor(progress) {
+            const stops = [
+                { t: 0.00, color: '#00e5ff' },
+                { t: 0.16, color: '#3f8cff' },
+                { t: 0.32, color: '#7a5cff' },
+                { t: 0.48, color: '#bf4dff' },
+                { t: 0.64, color: '#ff4fa8' },
+                { t: 0.78, color: '#ff7a59' },
+                { t: 0.90, color: '#ffb347' },
+                { t: 1.00, color: '#ff0033' }
+            ];
+
+            const p = Math.max(0, Math.min(1, progress));
+            for (let i = 0; i < stops.length - 1; i++) {
+                const s0 = stops[i];
+                const s1 = stops[i + 1];
+                if (p >= s0.t && p <= s1.t) {
+                    const localT = (p - s0.t) / (s1.t - s0.t || 1);
+                    return lerpColor(s0.color, s1.color, localT);
+                }
+            }
+            return stops[stops.length - 1].color;
+        }
+
+        function setRouteLayerVisibility() {
+            const canvas = document.getElementById('route-canvas');
+            const svg = document.getElementById('route-svg');
+            if (!canvas || !svg) return;
+
+            if (!isRouteVisible) {
+                canvas.style.display = 'none';
+                svg.style.display = 'none';
+                return;
+            }
+            canvas.style.display = routeRenderMode === 'canvas' ? 'block' : 'none';
+            svg.style.display = routeRenderMode === 'svg' ? 'block' : 'none';
+        }
+
         function drawRoute() {
             const svg = document.getElementById('route-svg');
-            if (!svg) return;
+            const canvas = document.getElementById('route-canvas');
+            if (!svg || !canvas) return;
             svg.innerHTML = '';
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
 
             if (routeAnimFrame) {
                 cancelAnimationFrame(routeAnimFrame);
                 routeAnimFrame = null;
             }
+            if (routeAnimTimeout) {
+                clearTimeout(routeAnimTimeout);
+                routeAnimTimeout = null;
+            }
+            routeDrawToken++;
 
+            setRouteLayerVisibility();
             if (dragRoute.length <= 1) return;
+
+            if (routeRenderMode === 'svg') {
+                drawRouteSvgCompat(svg);
+                return;
+            }
+            drawRouteCanvas(canvas, svg, routeDrawToken);
+        }
+
+        function drawRouteCanvas(canvas, svg, drawToken) {
+            const boardEl = document.getElementById('board');
+            const rect = boardEl.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, rect.width, rect.height);
 
             svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
 
@@ -997,101 +1100,38 @@
             let textDy = routeWidthBase * 1.5;
             let animRadius = Math.max(0.03, routeWidthBase * 1.5);
 
-            for (let i = 0; i < renderPoints.length; i++) {
-                let d = "";
-                if (i === 0) {
-                    if (renderPoints.length > 1) {
-                        let m0 = { x: (renderPoints[0].x + renderPoints[1].x) / 2, y: (renderPoints[0].y + renderPoints[1].y) / 2 };
-                        d = `M ${renderPoints[0].x} ${renderPoints[0].y} L ${m0.x} ${m0.y}`;
-                    }
-                } else if (i === renderPoints.length - 1) {
-                    let mPrev = { x: (renderPoints[i - 1].x + renderPoints[i].x) / 2, y: (renderPoints[i - 1].y + renderPoints[i].y) / 2 };
-                    d = `M ${mPrev.x} ${mPrev.y} L ${renderPoints[i].x} ${renderPoints[i].y}`;
-                } else {
-                    let mPrev = { x: (renderPoints[i - 1].x + renderPoints[i].x) / 2, y: (renderPoints[i - 1].y + renderPoints[i].y) / 2 };
-                    let mNext = { x: (renderPoints[i].x + renderPoints[i + 1].x) / 2, y: (renderPoints[i].y + renderPoints[i + 1].y) / 2 };
-                    let cp = calcCurvePoints(renderPoints[i - 1], renderPoints[i], renderPoints[i + 1], 0.2);
-                    d = `M ${mPrev.x} ${mPrev.y} L ${cp.start.x} ${cp.start.y} Q ${renderPoints[i].x} ${renderPoints[i].y} ${cp.end.x} ${cp.end.y} L ${mNext.x} ${mNext.y}`;
-                }
-
-                if (d) {
-                    let bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    bg.setAttribute('d', d);
-                    bg.setAttribute('class', 'route-line-bg');
-                    bg.setAttribute('stroke-width', bgWidth);
-                    bg.style.strokeLinecap = 'butt';
-                    svg.appendChild(bg);
-
-                    let fg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    fg.setAttribute('d', d);
-                    fg.setAttribute('class', 'route-line');
-                    fg.setAttribute('stroke-width', fgWidth);
-                    fg.style.strokeLinecap = 'round';
-                    svg.appendChild(fg);
-                }
-            }
-
-            let startP = renderPoints[0];
-            let startG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            let startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            startCircle.setAttribute('cx', startP.x);
-            startCircle.setAttribute('cy', startP.y);
-            startCircle.setAttribute('r', markerRadius);
-            startCircle.setAttribute('fill', '#00e5ff');
-            startCircle.setAttribute('stroke', '#000');
-            startCircle.setAttribute('stroke-width', '0.04');
-            startCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
-            let startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            startText.setAttribute('x', startP.x);
-            startText.setAttribute('y', startP.y);
-            startText.setAttribute('dy', textDy);
-            startText.setAttribute('font-size', textFontSize);
-            startText.setAttribute('text-anchor', 'middle');
-            startText.setAttribute('class', 'route-marker-text');
-            startText.setAttribute('fill', '#000');
-            startText.textContent = 'S';
-            startG.appendChild(startCircle);
-            startG.appendChild(startText);
-            svg.appendChild(startG);
-
-            let endP = renderPoints[renderPoints.length - 1];
-            let endG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            let endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            endCircle.setAttribute('cx', endP.x);
-            endCircle.setAttribute('cy', endP.y);
-            endCircle.setAttribute('r', markerRadius);
-            endCircle.setAttribute('fill', '#ff0033');
-            endCircle.setAttribute('stroke', '#000');
-            endCircle.setAttribute('stroke-width', '0.04');
-            endCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
-            let endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            endText.setAttribute('x', endP.x);
-            endText.setAttribute('y', endP.y);
-            endText.setAttribute('dy', textDy);
-            endText.setAttribute('font-size', textFontSize);
-            endText.setAttribute('text-anchor', 'middle');
-            endText.setAttribute('class', 'route-marker-text');
-            endText.setAttribute('fill', '#fff');
-            endText.textContent = 'E';
-            endG.appendChild(endCircle);
-            endG.appendChild(endText);
-            svg.appendChild(endG);
-
-            let animCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            animCircle.setAttribute('r', animRadius);
-            animCircle.setAttribute('fill', '#ffffff');
-            animCircle.setAttribute('filter', 'drop-shadow(0 0 2px rgba(0,0,0,0.8))');
-            svg.appendChild(animCircle);
-
             let totalLength = guidePath.getTotalLength();
+            let startP = renderPoints[0];
+            let endP = renderPoints[renderPoints.length - 1];
+            const routePath = new Path2D(fullD);
+            const scaleX = rect.width / COLS;
+            const scaleY = rect.height / ROWS;
+
             let stepTime = 120;
             let totalTime = (renderPoints.length - 1) * stepTime;
             let animStartTime = null;
             let waiting = false;
+            const gradSampleCount = Math.max(80, Math.min(260, Math.ceil(totalLength * 30)));
+            const gradSamples = [];
+            for (let i = 0; i <= gradSampleCount; i++) {
+                const t = i / gradSampleCount;
+                gradSamples.push({
+                    point: guidePath.getPointAtLength(totalLength * t),
+                    color: getRouteGradientColor(t)
+                });
+            }
+
+            const staticCanvas = document.createElement('canvas');
+            staticCanvas.width = canvas.width;
+            staticCanvas.height = canvas.height;
+            const staticCtx = staticCanvas.getContext('2d');
+            if (!staticCtx) return;
+            staticCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            buildStaticLayer(staticCtx);
 
             function animate(time) {
+                if (drawToken !== routeDrawToken) return;
                 if (waiting) {
-                    routeAnimFrame = requestAnimationFrame(animate);
                     return;
                 }
                 if (animStartTime === null) animStartTime = time;
@@ -1099,61 +1139,196 @@
 
                 if (elapsed >= totalTime) {
                     let lastP = renderPoints[renderPoints.length - 1];
-                    animCircle.setAttribute('cx', lastP.x);
-                    animCircle.setAttribute('cy', lastP.y);
+                    redrawStatic();
+                    drawAnimCircle(lastP.x, lastP.y);
                     waiting = true;
-                    setTimeout(() => {
+                    routeAnimTimeout = setTimeout(() => {
+                        routeAnimTimeout = null;
+                        if (drawToken !== routeDrawToken) return;
                         animStartTime = null;
                         waiting = false;
+                        routeAnimFrame = requestAnimationFrame(animate);
                     }, 1000);
+                    return;
                 } else {
                     let progress = Math.max(0, Math.min(1, elapsed / totalTime));
                     let pt = guidePath.getPointAtLength(progress * totalLength);
-                    animCircle.setAttribute('cx', pt.x);
-                    animCircle.setAttribute('cy', pt.y);
+                    redrawStatic();
+                    drawAnimCircle(pt.x, pt.y);
                 }
                 routeAnimFrame = requestAnimationFrame(animate);
             }
+
+            function redrawStatic() {
+                ctx.clearRect(0, 0, rect.width, rect.height);
+                ctx.drawImage(staticCanvas, 0, 0, rect.width, rect.height);
+            }
+
+            function drawAnimCircle(x, y) {
+                ctx.save();
+                ctx.scale(scaleX, scaleY);
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 0.02;
+                ctx.beginPath();
+                ctx.arc(x, y, animRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            function buildStaticLayer(targetCtx) {
+                targetCtx.clearRect(0, 0, rect.width, rect.height);
+                targetCtx.save();
+                targetCtx.scale(scaleX, scaleY);
+                targetCtx.lineCap = 'round';
+                targetCtx.lineJoin = 'round';
+
+                targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+                targetCtx.lineWidth = bgWidth;
+                targetCtx.stroke(routePath);
+
+                targetCtx.lineWidth = fgWidth;
+                for (let i = 0; i < gradSampleCount; i++) {
+                    const p0 = gradSamples[i].point;
+                    const p1 = gradSamples[i + 1].point;
+                    const color = gradSamples[i + 1].color;
+                    targetCtx.strokeStyle = color;
+                    targetCtx.beginPath();
+                    targetCtx.moveTo(p0.x, p0.y);
+                    targetCtx.lineTo(p1.x, p1.y);
+                    targetCtx.stroke();
+
+                    targetCtx.fillStyle = color;
+                    targetCtx.beginPath();
+                    targetCtx.arc(p1.x, p1.y, fgWidth * 0.52, 0, Math.PI * 2);
+                    targetCtx.fill();
+                }
+
+                targetCtx.lineWidth = 0.04;
+                targetCtx.fillStyle = '#00e5ff';
+                targetCtx.strokeStyle = '#000';
+                targetCtx.beginPath();
+                targetCtx.arc(startP.x, startP.y, markerRadius, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.stroke();
+                targetCtx.font = `bold ${textFontSize}px sans-serif`;
+                targetCtx.textAlign = 'center';
+                targetCtx.textBaseline = 'middle';
+                targetCtx.fillStyle = '#000';
+                targetCtx.fillText('S', startP.x, startP.y + textDy * 0.5);
+
+                targetCtx.fillStyle = '#ff0033';
+                targetCtx.strokeStyle = '#000';
+                targetCtx.beginPath();
+                targetCtx.arc(endP.x, endP.y, markerRadius, 0, Math.PI * 2);
+                targetCtx.fill();
+                targetCtx.stroke();
+                targetCtx.fillStyle = '#fff';
+                targetCtx.fillText('E', endP.x, endP.y + textDy * 0.5);
+                targetCtx.restore();
+            }
+
+            redrawStatic();
             routeAnimFrame = requestAnimationFrame(animate);
         }
 
+        function drawRouteSvgCompat(svg) {
+            svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
+            // 軽量な互換描画（必要時のみ）
+            let visitCount = {};
+            const offsetPatterns = [
+                { x: 0, y: 0 }, { x: 0.06, y: -0.06 }, { x: -0.06, y: 0.06 },
+                { x: 0.06, y: 0.06 }, { x: -0.06, y: -0.06 }, { x: 0.08, y: 0 },
+                { x: -0.08, y: 0 }, { x: 0, y: 0.08 }, { x: 0, y: -0.08 }
+            ];
+            let renderPoints = dragRoute.map(p => {
+                let key = `${p.c},${p.r}`;
+                let count = visitCount[key] || 0;
+                visitCount[key] = count + 1;
+                let offset = offsetPatterns[count % offsetPatterns.length];
+                return { x: p.c + 0.5 + offset.x, y: p.r + 0.5 + offset.y };
+            });
+            let d = '';
+            for (let i = 0; i < renderPoints.length; i++) {
+                if (i === 0) d += `M ${renderPoints[i].x} ${renderPoints[i].y} `;
+                else d += `L ${renderPoints[i].x} ${renderPoints[i].y} `;
+            }
+            let bgWidth = routeWidthBase * 2;
+            let fgWidth = routeWidthBase;
+            let bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            bg.setAttribute('d', d);
+            bg.setAttribute('fill', 'none');
+            bg.setAttribute('stroke', 'rgba(0,0,0,0.9)');
+            bg.setAttribute('stroke-width', bgWidth);
+            bg.setAttribute('stroke-linecap', 'round');
+            bg.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(bg);
+            let fg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            fg.setAttribute('d', d);
+            fg.setAttribute('fill', 'none');
+            fg.setAttribute('stroke', '#ffffff');
+            fg.setAttribute('stroke-width', fgWidth);
+            fg.setAttribute('stroke-linecap', 'round');
+            fg.setAttribute('stroke-linejoin', 'round');
+            svg.appendChild(fg);
+        }
+
+        function initDropCountDisplay() {
+            const container = document.getElementById('drop-counts');
+            container.innerHTML = '';
+            const fragment = document.createDocumentFragment();
+
+            ALL_COLORS.forEach(color => {
+                if (color === 'unmatchable') return;
+                const item = document.createElement('div');
+                item.className = 'count-item';
+                item.style.display = 'none';
+
+                const icon = document.createElement('div');
+                icon.className = `mini-orb ${color}`;
+
+                const text = document.createElement('span');
+                text.innerText = '×0';
+
+                item.appendChild(icon);
+                item.appendChild(text);
+                fragment.appendChild(item);
+                dropCountElements[color] = { item, text };
+            });
+
+            container.appendChild(fragment);
+        }
+
         function updateDropCounts() {
+            if (dropCountsQueued) return;
+            dropCountsQueued = true;
+            requestAnimationFrame(() => {
+                dropCountsQueued = false;
+                updateDropCountsNow();
+            });
+        }
+
+        function updateDropCountsNow() {
             if (!document.getElementById('count-toggle').checked) return;
 
             const counts = {};
-            ALL_COLORS.forEach(c => counts[c] = 0);
+            Object.keys(dropCountElements).forEach(color => counts[color] = 0);
 
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     if (board[r][c]) {
                         let color = board[r][c].dataset.color;
-                        if (counts[color] !== undefined) {
-                            counts[color]++;
-                        }
+                        if (counts[color] !== undefined) counts[color]++;
                     }
                 }
             }
 
-            const container = document.getElementById('drop-counts');
-            container.innerHTML = '';
-
-            ALL_COLORS.forEach(color => {
-                if (color === 'unmatchable') return;
-
-                if (counts[color] > 0) {
-                    let item = document.createElement('div');
-                    item.className = 'count-item';
-
-                    let icon = document.createElement('div');
-                    icon.className = `mini-orb ${color}`;
-
-                    let text = document.createElement('span');
-                    text.innerText = `×${counts[color]}`;
-
-                    item.appendChild(icon);
-                    item.appendChild(text);
-                    container.appendChild(item);
-                }
+            Object.keys(dropCountElements).forEach(color => {
+                const entry = dropCountElements[color];
+                const count = counts[color] || 0;
+                entry.text.innerText = `×${count}`;
+                entry.item.style.display = count > 0 ? 'flex' : 'none';
             });
         }
 
@@ -1266,7 +1441,7 @@
 
         document.getElementById('toggle-route-btn').addEventListener('click', () => {
             isRouteVisible = !isRouteVisible;
-            document.getElementById('route-svg').style.display = isRouteVisible ? 'block' : 'none';
+            setRouteLayerVisibility();
             updateButtonLabels();
         });
 
@@ -1285,6 +1460,29 @@
             result[currPos.r][currPos.c] = draggedColor;
             return result;
         }
+
+        function mirrorBoardColors(colors2D) {
+            return colors2D.map(row => [...row].reverse());
+        }
+
+        function mirrorRoute(route) {
+            return route.map(p => ({ r: p.r, c: COLS - 1 - p.c }));
+        }
+
+        document.getElementById('mirror-btn').addEventListener('click', () => {
+            if (isResolving) return;
+
+            savedBoardColors = mirrorBoardColors(savedBoardColors);
+            dragRoute = mirrorRoute(dragRoute);
+
+            if (originalBoardColors) {
+                originalBoardColors = mirrorBoardColors(originalBoardColors);
+            }
+
+            restoreBoardState(true);
+            drawRoute();
+            updateButtonLabels();
+        });
 
         document.getElementById('reverse-route-btn').addEventListener('click', () => {
             if (dragRoute.length <= 1 || isResolving) return;
@@ -1460,7 +1658,8 @@
 
         function createBoard() {
             const boardEl = document.getElementById('board');
-            boardEl.querySelectorAll('.orb').forEach(e => e.remove());
+            boardEl.querySelectorAll('.orb').forEach(recycleOrbElement);
+            const boardFragment = document.createDocumentFragment();
 
             board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
             savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
@@ -1485,18 +1684,20 @@
                     el.style.top = `${(r / ROWS) * 100}%`;
                     el.style.left = `${(c / COLS) * 100}%`;
                     board[r][c] = el;
-                    boardEl.appendChild(el);
+                    boardFragment.appendChild(el);
 
                     savedBoardColors[r][c] = color;
                 }
             }
+            boardEl.appendChild(boardFragment);
             resetComboText();
             updateDropCounts();
         }
 
         function restoreBoardState(keepCombo = false) {
             const boardEl = document.getElementById('board');
-            boardEl.querySelectorAll('.orb').forEach(e => e.remove());
+            boardEl.querySelectorAll('.orb').forEach(recycleOrbElement);
+            const boardFragment = document.createDocumentFragment();
 
             board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
 
@@ -1510,10 +1711,11 @@
                         el.style.top = `${(r / ROWS) * 100}%`;
                         el.style.left = `${(c / COLS) * 100}%`;
                         board[r][c] = el;
-                        boardEl.appendChild(el);
+                        boardFragment.appendChild(el);
                     }
                 }
             }
+            boardEl.appendChild(boardFragment);
             if (!keepCombo) {
                 resetComboText();
             }
@@ -1525,8 +1727,28 @@
             document.getElementById('combo-text').innerText = '';
         }
 
+        function recycleOrbElement(el) {
+            if (!el || el.__inPool) return;
+            if (el.parentNode) el.parentNode.removeChild(el);
+            el.__inPool = true;
+            el.className = 'orb';
+            el.style.transform = '';
+            el.style.opacity = '';
+            el.style.transition = '';
+            el.style.top = '';
+            el.style.left = '';
+            el.style.width = '';
+            el.style.height = '';
+            delete el.dataset.color;
+            delete el.dataset.r;
+            delete el.dataset.c;
+            delete el.dataset.unmatchable;
+            orbPool.push(el);
+        }
+
         function createOrbElement(color, r, c) {
-            let el = document.createElement('div');
+            let el = orbPool.pop() || document.createElement('div');
+            el.__inPool = false;
             el.className = 'orb ' + color;
             el.dataset.color = color;
             el.dataset.r = r;
@@ -1557,9 +1779,9 @@
         }
 
         function getGridPos(x, y, clamp = false) {
-            const rect = boardEl.getBoundingClientRect();
-            const cellW = rect.width / COLS;
-            const cellH = rect.height / ROWS;
+            const rect = cachedBoardRect || boardEl.getBoundingClientRect();
+            const cellW = cachedCellW || rect.width / COLS;
+            const cellH = cachedCellH || rect.height / ROWS;
             let c = Math.floor((x - rect.left) / cellW);
             let r = Math.floor((y - rect.top) / cellH);
 
@@ -1577,6 +1799,10 @@
             if (isResolving) return;
             if (!e.target.closest('#board') && !e.target.classList.contains('orb')) return;
             e.preventDefault();
+
+            cachedBoardRect = boardEl.getBoundingClientRect();
+            cachedCellW = cachedBoardRect.width / COLS;
+            cachedCellH = cachedBoardRect.height / ROWS;
 
             let { x, y } = getEventPos(e);
             let targetPos = getGridPos(x, y, false);
@@ -1617,6 +1843,7 @@
 
             } else if (currentMode === 'edit') {
                 isPainting = true;
+                lastPaintCellKey = '';
                 paintUnmatchableTargetState = 'true';
                 if (targetPos) {
                     let el = board[targetPos.r][targetPos.c];
@@ -1695,13 +1922,17 @@
 
             } else if (currentMode === 'edit') {
                 isPainting = false;
+                lastPaintCellKey = '';
             }
+            cachedBoardRect = null;
+            cachedCellW = 0;
+            cachedCellH = 0;
         }
 
         function updateDragPosition(x, y) {
-            const rect = boardEl.getBoundingClientRect();
-            const cellW = rect.width / COLS;
-            const cellH = rect.height / ROWS;
+            const rect = cachedBoardRect || boardEl.getBoundingClientRect();
+            const cellW = cachedCellW || rect.width / COLS;
+            const cellH = cachedCellH || rect.height / ROWS;
             let leftPx = (x - rect.left) - cellW / 2;
             let topPx = (y - rect.top) - cellH / 2;
             draggedElement.style.left = `${(leftPx / rect.width) * 100}%`;
@@ -1709,6 +1940,12 @@
         }
 
         function paintOrb(r, c) {
+            const paintKey = `${r},${c},${selectedEditColor},${paintUnmatchableTargetState}`;
+            if (currentMode === 'edit' && isPainting && lastPaintCellKey === paintKey) {
+                return;
+            }
+            lastPaintCellKey = paintKey;
+
             let el = board[r][c];
             if (!el) {
                 if (selectedEditColor !== 'unmatchable') {
@@ -1804,7 +2041,7 @@
                     if (el) {
                         el.classList.add('exploded');
                         board[r][c] = null;
-                        setTimeout(() => { if (el && el.parentNode) el.remove(); }, 250);
+                        setTimeout(() => recycleOrbElement(el), 250);
                         bombExplodedThisTurn = true;
                     }
                 });
@@ -1872,7 +2109,7 @@
                             el.style.transform = 'scale(0)';
                             el.style.opacity = '0';
                             board[m.r][m.c] = null;
-                            setTimeout(() => { if (el && el.parentNode) el.remove(); }, 250);
+                            setTimeout(() => recycleOrbElement(el), 250);
                         }
                     });
                     await sleep(comboDelayMs);
@@ -1966,6 +2203,8 @@
             let speedStr = document.documentElement.style.getPropertyValue('--fall-speed') || '0.1s';
             let fallTimeMs = parseFloat(speedStr) * 1000;
             let moved = false;
+            const boardEl = document.getElementById('board');
+            const spawnFragment = document.createDocumentFragment();
 
             for (let c = 0; c < COLS; c++) {
                 let emptyCount = 0;
@@ -1992,7 +2231,7 @@
                         newEl.style.top = `${((r - emptyCount) / ROWS) * 100}%`;
                         newEl.style.left = `${(c / COLS) * 100}%`;
                         board[r][c] = newEl;
-                        document.getElementById('board').appendChild(newEl);
+                        spawnFragment.appendChild(newEl);
 
                         newEl.offsetHeight;
                         newEl.classList.add('falling');
@@ -2001,6 +2240,7 @@
                     }
                 }
             }
+            boardEl.appendChild(spawnFragment);
 
             if (moved) {
                 if (currentResolveId && currentResolveId !== resolveId) return;
@@ -2014,6 +2254,7 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
+        initDropCountDisplay();
         createBoard();
         updateButtonLabels();
     </script>
