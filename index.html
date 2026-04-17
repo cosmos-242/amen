@@ -340,7 +340,6 @@
             background: #444;
         }
 
-        /* ★ 修正：コンボテキストの位置を調整 */
         #combo-text {
             position: absolute;
             top: 14.5%;
@@ -661,7 +660,6 @@
         <div id="combo-text"></div>
 
         <div id="board-area">
-
             <div id="board-buttons-wrapper">
                 <div class="btn-row" id="row-autoplay">
                     <button id="mirror-btn">↔ 左右入れ替え</button>
@@ -793,7 +791,7 @@
         let routeDrawToken = 0;
         let isRouteVisible = true;
         let routeWidthBase = 0.04;
-        let routeRenderMode = 'canvas'; // 'canvas' | 'svg'
+        let routeRenderMode = 'canvas';
 
         let originalBoardColors = null;
         let isReversedState = false;
@@ -1014,6 +1012,78 @@
             svg.style.display = routeRenderMode === 'svg' ? 'block' : 'none';
         }
 
+        // ★追加：ルートを直角に保ったまま平行にずらすための交点計算アルゴリズム
+        function getOrthogonalRenderPoints(route, baseWidth) {
+            if (route.length <= 1) return route.map(p => ({ x: p.c + 0.5, y: p.r + 0.5 }));
+
+            let segments = [];
+            let edgeCounts = {};
+            let gap = baseWidth * 2.5;
+
+            for (let i = 0; i < route.length - 1; i++) {
+                let p1 = route[i];
+                let p2 = route[i + 1];
+                let rMin = Math.min(p1.r, p2.r), rMax = Math.max(p1.r, p2.r);
+                let cMin = Math.min(p1.c, p2.c), cMax = Math.max(p1.c, p2.c);
+                let edgeKey = `${rMin},${cMin}-${rMax},${cMax}`;
+
+                let lane = edgeCounts[edgeKey] || 0;
+                edgeCounts[edgeKey] = lane + 1;
+
+                let offset = 0;
+                if (lane > 0) {
+                    let sign = lane % 2 === 1 ? 1 : -1;
+                    offset = sign * Math.ceil(lane / 2) * gap;
+                }
+
+                let isH = p1.r === p2.r;
+                let isV = p1.c === p2.c;
+
+                segments.push({
+                    isH: isH,
+                    isV: isV,
+                    lineVal: isH ? (p1.r + 0.5 + offset) : (p1.c + 0.5 + offset),
+                    cellC: p2.c + 0.5,
+                    cellR: p2.r + 0.5
+                });
+            }
+
+            let pts = [];
+
+            let seg0 = segments[0];
+            let startCell = route[0];
+            pts.push({
+                x: seg0.isH ? (startCell.c + 0.5) : seg0.lineVal,
+                y: seg0.isV ? (startCell.r + 0.5) : seg0.lineVal
+            });
+
+            for (let i = 0; i < segments.length - 1; i++) {
+                let s1 = segments[i];
+                let s2 = segments[i + 1];
+
+                if (s1.isH && s2.isV) {
+                    pts.push({ x: s2.lineVal, y: s1.lineVal });
+                } else if (s1.isV && s2.isH) {
+                    pts.push({ x: s1.lineVal, y: s2.lineVal });
+                } else if (s1.isH && s2.isH) {
+                    pts.push({ x: s1.cellC, y: s1.lineVal });
+                    pts.push({ x: s1.cellC, y: s2.lineVal });
+                } else if (s1.isV && s2.isV) {
+                    pts.push({ x: s1.lineVal, y: s1.cellR });
+                    pts.push({ x: s2.lineVal, y: s1.cellR });
+                }
+            }
+
+            let segLast = segments[segments.length - 1];
+            let endCell = route[route.length - 1];
+            pts.push({
+                x: segLast.isH ? (endCell.c + 0.5) : segLast.lineVal,
+                y: segLast.isV ? (endCell.r + 0.5) : segLast.lineVal
+            });
+
+            return pts;
+        }
+
         function drawRoute() {
             const svg = document.getElementById('route-svg');
             const canvas = document.getElementById('route-canvas');
@@ -1061,20 +1131,8 @@
 
             svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
 
-            let visitCount = {};
-            const offsetPatterns = [
-                { x: 0, y: 0 }, { x: 0.06, y: -0.06 }, { x: -0.06, y: 0.06 },
-                { x: 0.06, y: 0.06 }, { x: -0.06, y: -0.06 }, { x: 0.08, y: 0 },
-                { x: -0.08, y: 0 }, { x: 0, y: 0.08 }, { x: 0, y: -0.08 }
-            ];
-
-            let renderPoints = dragRoute.map(p => {
-                let key = `${p.c},${p.r}`;
-                let count = visitCount[key] || 0;
-                visitCount[key] = count + 1;
-                let offset = offsetPatterns[count % offsetPatterns.length];
-                return { x: p.c + 0.5 + offset.x, y: p.r + 0.5 + offset.y };
-            });
+            // ★ 修正：ここで関数を呼び出し、直交ルートのポイントを取得
+            let renderPoints = getOrthogonalRenderPoints(dragRoute, routeWidthBase);
 
             let fullD = "";
             for (let i = 0; i < renderPoints.length; i++) {
@@ -1235,20 +1293,10 @@
 
         function drawRouteSvgCompat(svg) {
             svg.setAttribute('viewBox', `0 0 ${COLS} ${ROWS}`);
-            // 軽量な互換描画（必要時のみ）
-            let visitCount = {};
-            const offsetPatterns = [
-                { x: 0, y: 0 }, { x: 0.06, y: -0.06 }, { x: -0.06, y: 0.06 },
-                { x: 0.06, y: 0.06 }, { x: -0.06, y: -0.06 }, { x: 0.08, y: 0 },
-                { x: -0.08, y: 0 }, { x: 0, y: 0.08 }, { x: 0, y: -0.08 }
-            ];
-            let renderPoints = dragRoute.map(p => {
-                let key = `${p.c},${p.r}`;
-                let count = visitCount[key] || 0;
-                visitCount[key] = count + 1;
-                let offset = offsetPatterns[count % offsetPatterns.length];
-                return { x: p.c + 0.5 + offset.x, y: p.r + 0.5 + offset.y };
-            });
+
+            // ★ 修正：こちらも関数呼び出しに置き換え
+            let renderPoints = getOrthogonalRenderPoints(dragRoute, routeWidthBase);
+
             let d = '';
             for (let i = 0; i < renderPoints.length; i++) {
                 if (i === 0) d += `M ${renderPoints[i].x} ${renderPoints[i].y} `;
@@ -1514,7 +1562,6 @@
             drawRoute();
         });
 
-        // ★ 修正：自動再生の安定化
         document.getElementById('autoplay-btn').addEventListener('click', () => {
             if (dragRoute.length <= 1 || isResolving) return;
 
@@ -1532,9 +1579,6 @@
             }
 
             restoreBoardState(true);
-
-            // ★ 削除：ここにあった isRouteVisible の強制上書き処理を削除しました
-            // if (!isRouteVisible) { ... }
 
             let route = dragRoute;
             let startPos = route[0];
