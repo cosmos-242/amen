@@ -13,19 +13,37 @@
             --cols: 6;
         }
 
+        /* 修正1: サイト全体のスクロールとアドレスバーの伸縮を完全にロック */
+        html,
         body {
             margin: 0;
             padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* 全体のスクロールを禁止 */
+            position: fixed;
+            /* iOSでのアドレスバー伸縮と画面揺れを防ぐ要 */
+            overscroll-behavior: none;
+            /* 引っ張り(バウンス)効果を無効化 */
             background-color: #111;
+            font-family: sans-serif;
+            color: #fff;
+        }
+
+        /* 修正2: スクロールが必要なコンテンツを包む専用ラッパー */
+        #main-wrapper {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overscroll-behavior: none;
+            /* ラッパー内の引っ張り効果も無効化 */
+            -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
-            min-height: 100vh;
-            overflow-x: hidden;
-            overflow-y: auto;
-            font-family: sans-serif;
-            color: #fff;
         }
 
         #app-container {
@@ -636,7 +654,7 @@
             border-radius: 20%;
         }
 
-        /* --- 追加：使い方アコーディオンとトップへ戻るボタンのスタイル --- */
+        /* --- 使い方アコーディオンとトップへ戻るボタンのスタイル --- */
         .usage-details {
             background: #333;
             border-radius: 8px;
@@ -720,178 +738,178 @@
 
 <body>
 
-    <div id="app-container">
+    <div id="main-wrapper">
+        <div id="app-container">
 
-        <div id="mode-tabs">
-            <div class="tab active" data-mode="puzzle">パズル</div>
-            <div class="tab" data-mode="edit">配置</div>
-            <div class="tab" data-mode="rearrange">組み換え</div>
-        </div>
-
-        <button id="settings-btn">⚙️ 設定メニュー</button>
-
-        <div id="edit-controls" class="control-panel">
-            <div id="palette-container">
-                <div id="palette-top" class="palette-row"></div>
-                <div id="palette-bottom" class="palette-row"></div>
+            <div id="mode-tabs">
+                <div class="tab active" data-mode="puzzle">パズル</div>
+                <div class="tab" data-mode="edit">配置</div>
+                <div class="tab" data-mode="rearrange">組み換え</div>
             </div>
-        </div>
 
-        <div id="combo-text"></div>
+            <button id="settings-btn">⚙️ 設定メニュー</button>
 
-        <div id="board-area">
-            <div id="board-buttons-wrapper">
-                <div class="btn-row" id="row-autoplay">
-                    <button id="mirror-btn">↔ 左右入れ替え</button>
-                    <button id="autoplay-btn">▶ 自動再生</button>
-                </div>
-                <div class="btn-row" id="row-reverse">
-                    <button id="toggle-route-btn">ルート非表示</button>
-                    <button id="reverse-route-btn">逆再現</button>
-                </div>
-                <div class="btn-row" id="row-main">
-                    <button id="new-board-btn">新しい盤面</button>
-                    <button id="reset-btn">リセット</button>
+            <div id="edit-controls" class="control-panel">
+                <div id="palette-container">
+                    <div id="palette-top" class="palette-row"></div>
+                    <div id="palette-bottom" class="palette-row"></div>
                 </div>
             </div>
 
-            <div id="drop-counts"></div>
+            <div id="combo-text"></div>
 
-            <div id="board">
-                <canvas id="route-canvas"></canvas>
-                <svg id="route-svg"></svg>
+            <div id="board-area">
+                <div id="board-buttons-wrapper">
+                    <div class="btn-row" id="row-autoplay">
+                        <button id="mirror-btn">↔ 左右入れ替え</button>
+                        <button id="autoplay-btn">▶ 自動再生</button>
+                    </div>
+                    <div class="btn-row" id="row-reverse">
+                        <button id="toggle-route-btn">ルート非表示</button>
+                        <button id="reverse-route-btn">逆再現</button>
+                    </div>
+                    <div class="btn-row" id="row-main">
+                        <button id="new-board-btn">新しい盤面</button>
+                        <button id="reset-btn">リセット</button>
+                    </div>
+                </div>
+
+                <div id="drop-counts"></div>
+
+                <div id="board">
+                    <canvas id="route-canvas"></canvas>
+                    <svg id="route-svg"></svg>
+                </div>
             </div>
-        </div>
 
-        <div id="settings-modal">
-            <div class="settings-content">
-                <div class="settings-header">設定</div>
+            <div id="settings-modal">
+                <div class="settings-content">
+                    <div class="settings-header">設定</div>
 
-                <div class="settings-subheader" style="margin-top: 0;">盤面サイズ設定</div>
-                <div id="size-tabs">
-                    <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
-                    <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
+                    <div class="settings-subheader" style="margin-top: 0;">盤面サイズ設定</div>
+                    <div id="size-tabs">
+                        <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
+                        <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
+                    <div class="settings-subheader" style="margin-top: 0;">新しい盤面設定</div>
+                    <div id="spawn-settings" class="spawn-settings">
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
+                    <div style="display: flex; justify-content: space-around; width: 100%;">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="ochicon-toggle" autocomplete="off"> 落ちコンあり </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="count-toggle" checked autocomplete="off"> ドロップ個数表示 </label>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 2vw; width: 100%;">
+                        <span style="font-size: 1.8vh; font-weight: bold; color: #ffd700;">〇個以下で消せない</span>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="min-4-toggle" autocomplete="off"> 3
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="min-5-toggle" autocomplete="off"> 4
+                        </label>
+                    </div>
+
+                    <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
+
+                    <div class="control-row">
+                        <label>消える速度: <span id="combo-speed-display">0.20</span>s</label>
+                        <input type="range" id="combo-speed-slider" min="0.05" max="1.0" step="0.05" value="0.2">
+                    </div>
+                    <div class="control-row">
+                        <label>落下速度: <span id="speed-display">0.1</span>s</label>
+                        <input type="range" id="speed-slider" min="0.1" max="1.0" step="0.1" value="0.1">
+                    </div>
+                    <div class="control-row">
+                        <label>入れ替わり速度: <span id="swap-speed-display">0.15</span>s</label>
+                        <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
+                    </div>
+
+                    <div class="control-row">
+                        <label>自動再生速度: <span id="autoplay-speed-display">0.15</span>s</label>
+                        <input type="range" id="autoplay-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
+                    </div>
+
+                    <div class="control-row">
+                        <label>ルートの太さ: <span id="route-width-display">0.04</span></label>
+                        <input type="range" id="route-width-slider" min="0.01" max="0.1" step="0.01" value="0.04">
+                    </div>
+
+                    <button id="close-settings-btn" class="close-btn">閉じる</button>
                 </div>
-
-                <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
-                <div class="settings-subheader" style="margin-top: 0;">新しい盤面設定</div>
-                <div id="spawn-settings" class="spawn-settings">
-                </div>
-
-                <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
-                <div style="display: flex; justify-content: space-around; width: 100%;">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="ochicon-toggle" autocomplete="off"> 落ちコンあり </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" id="count-toggle" checked autocomplete="off"> ドロップ個数表示 </label>
-                </div>
-
-                <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
-                <div style="display: flex; justify-content: center; align-items: center; gap: 2vw; width: 100%;">
-                    <span style="font-size: 1.8vh; font-weight: bold; color: #ffd700;">〇個以下で消せない</span>
-                    <label class="toggle-label">
-                        <input type="checkbox" id="min-4-toggle" autocomplete="off"> 3
-                    </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" id="min-5-toggle" autocomplete="off"> 4
-                    </label>
-                </div>
-
-                <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
-                <div class="control-row">
-                    <label>消える速度: <span id="combo-speed-display">0.20</span>s</label>
-                    <input type="range" id="combo-speed-slider" min="0.05" max="1.0" step="0.05" value="0.2">
-                </div>
-                <div class="control-row">
-                    <label>落下速度: <span id="speed-display">0.1</span>s</label>
-                    <input type="range" id="speed-slider" min="0.1" max="1.0" step="0.1" value="0.1">
-                </div>
-                <div class="control-row">
-                    <label>入れ替わり速度: <span id="swap-speed-display">0.15</span>s</label>
-                    <input type="range" id="swap-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
-                </div>
-
-                <div class="control-row">
-                    <label>自動再生速度: <span id="autoplay-speed-display">0.15</span>s</label>
-                    <input type="range" id="autoplay-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15">
-                </div>
-
-                <div class="control-row">
-                    <label>ルートの太さ: <span id="route-width-display">0.04</span></label>
-                    <input type="range" id="route-width-slider" min="0.01" max="0.1" step="0.01" value="0.04">
-                </div>
-
-                <button id="close-settings-btn" class="close-btn">閉じる</button>
             </div>
+
         </div>
 
-    </div>
+        <div id="footer">
 
-    <div id="footer">
+            <div id="usage-container">
+                <details class="usage-details">
+                    <summary class="usage-summary"> 使い方説明</summary>
+                    <div class="usage-content">
+                        <details>
+                            <summary>⚙️ 設定メニュー</summary>
+                            <ul>
+                                <li>変更があった場合、閉じるボタン、またはウィンドウ外をタップすることで自動で保存されます。</li>
+                                <li>「盤面サイズ設定」：盤面のサイズを変更できます。</li>
+                                <li>「新しい盤面設定」：落ちコン、新しい盤面ボタンで出現するドロップの種類を変更できます。（ただし、落ちコンで爆弾ドロップが出現することはありません。）</li>
+                                <li>「落ちコン」「ドロップ個数表示」：落ちコンの有無、ドロップの個数表示の切り替えができます。</li>
+                                <li>「〇個以下で消せない」：ドロップを消すときの個数条件の設定ができます。</li>
+                                <li>「〇〇速度・ルートの太さ」：各種変更が可能です。</li>
+                            </ul>
+                        </details>
+                        <details>
+                            <summary> パズルモード</summary>
+                            <ul>
+                                <li>ドロップを自由に動かしてパズルを練習できます。</li>
+                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
+                                <li>「リセット」ボタン：即座にパズル前の盤面に戻します。</li>
+                                <li>「ルート表示・非表示」ボタン：組み換えモードで記録したルートの表示切替ができます。</li>
+                            </ul>
+                        </details>
+                        <details>
+                            <summary> 配置モード</summary>
+                            <ul>
+                                <li>パレットから色を選び、盤面をタップまたはドラッグで変更できます。</li>
+                                <li>特定のドロップを「消せないドロップ」に設定することもできます。</li>
+                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
+                                <li>「リセット」ボタン：即座にドロップ変更前の盤面に戻します。</li>
+                            </ul>
+                        </details>
+                        <details>
+                            <summary> 組み換えモード</summary>
+                            <ul>
+                                <li>ドロップを動かしても消えず、動かした軌跡（ルート）が記録されます。</li>
+                                <li>ルート作成後は、ルートリセットボタンを押すまで再描画されません。</li>
+                                <li>「盤面リセット」ボタン：即座にパズル前の盤面に戻します。</li>
+                                <li>「ルートリセット」ボタン：記録されたルートを削除します。</li>
+                                <li>「逆再現」ボタン：組み換え前後（パズル前後の盤面とルート）の切り替えができます。</li>
+                                <li>「ルート表示・非表示」ボタン：保存したルートの表示切替ができます。</li>
+                                <li>「自動再生」ボタン：作成したルートの動きを確認できます。</li>
+                                <li>「左右入れ替え」ボタン：盤面とルートの左右を入れ替えます。</li>
+                            </ul>
+                        </details>
+                    </div>
+                </details>
+            </div>
 
-        <div id="usage-container">
-            <details class="usage-details">
-                <summary class="usage-summary"> 使い方説明</summary>
-                <div class="usage-content">
-                    <details>
-                        <summary> 設定メニュー</summary>
-                        <ul>
-                            <li>変更があった場合、閉じるボタン、またはウィンドウ外をタップすることで自動で保存されます。</li>
-                            <li>「盤面サイズ設定」：盤面のサイズを変更できます。</li>
-                            <li>「新しい盤面設定」：落ちコン、新しい盤面ボタンで出現するドロップの種類を変更できます。（ただし、落ちコンで爆弾ドロップが出現することはありません。）</li>
-                            <li>「落ちコン」「ドロップ個数表示」：落ちコンの有無、ドロップの個数表示の切り替えができます。</li>
-                            <li>「〇個以下で消せない」：ドロップを消すときの個数条件の設定ができます。</li>
-                            <li>「〇〇速度・ルートの太さ」：各種変更が可能です。</li>
-                        </ul>
-                    </details>
-                    <details>
-                        <summary> パズルモード</summary>
-                        <ul>
-                            <li>ドロップを自由に動かしてパズルを練習できます。</li>
-                            <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
-                            <li>「リセット」ボタン：即座にパズル前の盤面に戻します。</li>
-                            <li>「ルート表示・非表示」ボタン：組み換えモードで記録したルートの表示切替ができます。</li>
-                        </ul>
-                    </details>
-                    <details>
-                        <summary> 配置モード</summary>
-                        <ul>
-                            <li>パレットから色を選び、盤面をタップまたはドラッグで変更できます。</li>
-                            <li>特定のドロップを「消せないドロップ」に設定することもできます。</li>
-                            <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
-                            <li>「リセット」ボタン：即座にドロップ変更前の盤面に戻します。</li>
-                        </ul>
-                    </details>
-                    <details>
-                        <summary> 組み換えモード</summary>
-                        <ul>
-                            <li>ドロップを動かしても消えず、動かした軌跡（ルート）が記録されます。</li>
-                            <li>ルート作成後は、ルートリセットボタンを押すまで再描画されません。</li>
-                            <li>「盤面リセット」ボタン：即座にパズル前の盤面に戻します。</li>
-                            <li>「ルートリセット」ボタン：記録されたルートを削除します。</li>
-                            <li>「逆再現」ボタン：組み換え前後（パズル前後の盤面とルート）の切り替えができます。</li>
-                            <li>「ルート表示・非表示」ボタン：保存したルートの表示切替ができます。</li>
-                            <li>「自動再生」ボタン：作成したルートの動きを確認できます。</li>
-                            <li>「左右入れ替え」ボタン：盤面とルートの左右を入れ替えます。</li>
-                        </ul>
-                    </details>
-                </div>
-            </details>
+            <p>※当サイトは『パズル＆ドラゴンズ』の非公式ファンツール（配置シミュレーター）です。</p>
+            <p>ガンホー・オンライン・エンターテイメント株式会社様、および関連企業様とは一切関係ございません。</p>
+
+            <p class="highlight-text" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px;">
+                作成者: <a href="https://x.com/before_maple" target="_blank" rel="noopener noreferrer">秋桜</a>
+            </p>
         </div>
-
-        <p>※当サイトは『パズル＆ドラゴンズ』の非公式ファンツール（配置シミュレーター）です。</p>
-        <p>ガンホー・オンライン・エンターテイメント株式会社様、および関連企業様とは一切関係ございません。</p>
-
-        <p class="highlight-text" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px;">
-            作成者: <a href="https://x.com/before_maple" target="_blank" rel="noopener noreferrer">秋桜</a>
-        </p>
-    </div>
-
-    <button id="back-to-top" title="トップへ戻る">▲</button>
+    </div> <button id="back-to-top" title="トップへ戻る">▲</button>
 
     <script>
         let ROWS = 5;
@@ -940,6 +958,17 @@
         const dropCountElements = {};
         let dropCountsQueued = false;
         const orbPool = [];
+
+        // 修正4: パズル領域での誤ったスワイプによる画面揺れをJSで強力にブロック
+        document.getElementById('app-container').addEventListener('touchmove', function (e) {
+            const settingsModal = document.getElementById('settings-modal');
+            // 設定メニューが開いていて、かつメニューの中身をスクロールしている場合は許可
+            if (settingsModal.classList.contains('active') && e.target.closest('.settings-content')) {
+                return;
+            }
+            // それ以外（盤面周りの余白などをスワイプしたとき）は画面を動かさない
+            e.preventDefault();
+        }, { passive: false });
 
         function updateButtonLabels() {
             const newBoardBtn = document.getElementById('new-board-btn');
@@ -1903,6 +1932,10 @@
 
         function recycleOrbElement(el) {
             if (!el || el.__inPool) return;
+            if (el.__recycleTimeout) {
+                clearTimeout(el.__recycleTimeout);
+                el.__recycleTimeout = null;
+            }
             if (el.parentNode) el.parentNode.removeChild(el);
             el.__inPool = true;
             el.className = 'orb';
@@ -2215,7 +2248,12 @@
                     if (el) {
                         el.classList.add('exploded');
                         board[r][c] = null;
-                        setTimeout(() => recycleOrbElement(el), 250);
+
+                        el.__recycleTimeout = setTimeout(() => {
+                            el.__recycleTimeout = null;
+                            recycleOrbElement(el);
+                        }, 250);
+
                         bombExplodedThisTurn = true;
                     }
                 });
@@ -2283,7 +2321,11 @@
                             el.style.transform = 'scale(0)';
                             el.style.opacity = '0';
                             board[m.r][m.c] = null;
-                            setTimeout(() => recycleOrbElement(el), 250);
+
+                            el.__recycleTimeout = setTimeout(() => {
+                                el.__recycleTimeout = null;
+                                recycleOrbElement(el);
+                            }, 250);
                         }
                     });
                     await sleep(comboDelayMs);
@@ -2379,6 +2421,7 @@
             let moved = false;
             const boardEl = document.getElementById('board');
             const spawnFragment = document.createDocumentFragment();
+            let newSpawnedOrbs = [];
 
             for (let c = 0; c < COLS; c++) {
                 let emptyCount = 0;
@@ -2402,19 +2445,28 @@
                         let newColor = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
                         let newEl = createOrbElement(newColor, r, c);
 
+                        newEl.style.transition = 'none';
                         newEl.style.top = `${((r - emptyCount) / ROWS) * 100}%`;
                         newEl.style.left = `${(c / COLS) * 100}%`;
                         board[r][c] = newEl;
                         spawnFragment.appendChild(newEl);
 
-                        newEl.offsetHeight;
-                        newEl.classList.add('falling');
-                        newEl.style.top = `${(r / ROWS) * 100}%`;
+                        newSpawnedOrbs.push({ el: newEl, targetTop: `${(r / ROWS) * 100}%` });
                         moved = true;
                     }
                 }
             }
+
             boardEl.appendChild(spawnFragment);
+
+            if (newSpawnedOrbs.length > 0) {
+                boardEl.offsetHeight;
+                newSpawnedOrbs.forEach(item => {
+                    item.el.style.transition = '';
+                    item.el.classList.add('falling');
+                    item.el.style.top = item.targetTop;
+                });
+            }
 
             if (moved) {
                 if (currentResolveId && currentResolveId !== resolveId) return;
@@ -2428,10 +2480,11 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // --- 追加：トップへ戻るボタンのJSロジック ---
-        window.addEventListener('scroll', () => {
+        // --- トップへ戻るボタンのJSロジック ---
+        // ※ラッパー内スクロールに変更したため、監視対象を window から main-wrapper に変更
+        document.getElementById('main-wrapper').addEventListener('scroll', (e) => {
             const btn = document.getElementById('back-to-top');
-            if (window.scrollY > 300) {
+            if (e.target.scrollTop > 300) {
                 btn.style.display = 'block';
             } else {
                 btn.style.display = 'none';
@@ -2439,7 +2492,7 @@
         });
 
         document.getElementById('back-to-top').addEventListener('click', () => {
-            window.scrollTo({
+            document.getElementById('main-wrapper').scrollTo({
                 top: 0,
                 behavior: 'smooth'
             });
