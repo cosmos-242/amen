@@ -1542,11 +1542,9 @@
                 let newMode = e.target.dataset.mode;
                 if (currentMode === newMode) return;
 
-                // 【最適化】1. まずUI（タブの色）を即座に変更してレスポンスを返す
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
 
-                // 【最適化】2. 次の描画フレームで実際の重い処理（DOM操作・状態保存）を行う
                 requestAnimationFrame(() => {
                     resolveId++;
                     isResolving = false;
@@ -1575,11 +1573,9 @@
 
         document.querySelectorAll('.size-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
-                // 【最適化】1. UIを即座に更新
                 document.querySelectorAll('.size-tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
 
-                // 【最適化】2. DOMの破棄と再構築は次のフレームで行う
                 requestAnimationFrame(() => {
                     resolveId++;
                     isResolving = false;
@@ -2484,6 +2480,11 @@
             const spawnFragment = document.createDocumentFragment();
             let newSpawnedOrbs = [];
 
+            // --- 修正箇所：落ちコン用の配列を作成し、爆弾('bom')を除外する ---
+            let fallColors = activeSpawnColors.filter(color => color !== 'bom');
+            // 万が一「爆弾」しか選択されていない場合は、エラーを防ぐため基本色をセット
+            if (fallColors.length === 0) fallColors = BASE_COLORS;
+
             for (let c = 0; c < COLS; c++) {
                 let emptyCount = 0;
 
@@ -2503,7 +2504,8 @@
 
                 if (spawnNew) {
                     for (let r = 0; r < emptyCount; r++) {
-                        let newColor = activeSpawnColors[Math.floor(Math.random() * activeSpawnColors.length)];
+                        // 修正箇所：activeSpawnColors ではなく fallColors からランダムに選択
+                        let newColor = fallColors[Math.floor(Math.random() * fallColors.length)];
                         let newEl = createOrbElement(newColor, r, c);
 
                         newEl.style.transition = 'none';
