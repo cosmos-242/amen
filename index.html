@@ -13,7 +13,6 @@
             --cols: 6;
         }
 
-        /* 修正1: サイト全体のスクロールとアドレスバーの伸縮を完全にロック */
         html,
         body {
             margin: 0;
@@ -21,24 +20,19 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            /* 全体のスクロールを禁止 */
             position: fixed;
-            /* iOSでのアドレスバー伸縮と画面揺れを防ぐ要 */
             overscroll-behavior: none;
-            /* 引っ張り(バウンス)効果を無効化 */
             background-color: #111;
             font-family: sans-serif;
             color: #fff;
         }
 
-        /* 修正2: スクロールが必要なコンテンツを包む専用ラッパー */
         #main-wrapper {
             width: 100%;
             height: 100%;
             overflow-y: auto;
             overflow-x: hidden;
             overscroll-behavior: none;
-            /* ラッパー内の引っ張り効果も無効化 */
             -webkit-overflow-scrolling: touch;
             display: flex;
             flex-direction: column;
@@ -654,7 +648,6 @@
             border-radius: 20%;
         }
 
-        /* --- 使い方アコーディオンとトップへ戻るボタンのスタイル --- */
         .usage-details {
             background: #333;
             border-radius: 8px;
@@ -671,14 +664,12 @@
             color: #fff;
             background: #444;
             list-style: none;
-            /* デフォルトの矢印を消す */
             outline: none;
             text-align: center;
         }
 
         .usage-summary::-webkit-details-marker {
             display: none;
-            /* Safari用矢印消し */
         }
 
         .usage-content {
@@ -724,7 +715,6 @@
             cursor: pointer;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             display: none;
-            /* 初期は非表示 */
             z-index: 1000;
             transition: opacity 0.3s, transform 0.3s;
         }
@@ -854,7 +844,7 @@
 
             <div id="usage-container">
                 <details class="usage-details">
-                    <summary class="usage-summary"> 使い方説明</summary>
+                    <summary class="usage-summary">💡 使い方説明</summary>
                     <div class="usage-content">
                         <details>
                             <summary>⚙️ 設定メニュー</summary>
@@ -868,7 +858,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary> パズルモード</summary>
+                            <summary>▶ パズルモード</summary>
                             <ul>
                                 <li>ドロップを自由に動かしてパズルを練習できます。</li>
                                 <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
@@ -877,7 +867,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary> 配置モード</summary>
+                            <summary>▶ 配置モード</summary>
                             <ul>
                                 <li>パレットから色を選び、盤面をタップまたはドラッグで変更できます。</li>
                                 <li>特定のドロップを「消せないドロップ」に設定することもできます。</li>
@@ -886,7 +876,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary> 組み換えモード</summary>
+                            <summary>▶ 組み換えモード</summary>
                             <ul>
                                 <li>ドロップを動かしても消えず、動かした軌跡（ルート）が記録されます。</li>
                                 <li>ルート作成後は、ルートリセットボタンを押すまで再描画されません。</li>
@@ -909,7 +899,9 @@
                 作成者: <a href="https://x.com/before_maple" target="_blank" rel="noopener noreferrer">秋桜</a>
             </p>
         </div>
-    </div> <button id="back-to-top" title="トップへ戻る">▲</button>
+    </div>
+
+    <button id="back-to-top" title="トップへ戻る">▲</button>
 
     <script>
         let ROWS = 5;
@@ -958,17 +950,6 @@
         const dropCountElements = {};
         let dropCountsQueued = false;
         const orbPool = [];
-
-        // 修正4: パズル領域での誤ったスワイプによる画面揺れをJSで強力にブロック
-        document.getElementById('app-container').addEventListener('touchmove', function (e) {
-            const settingsModal = document.getElementById('settings-modal');
-            // 設定メニューが開いていて、かつメニューの中身をスクロールしている場合は許可
-            if (settingsModal.classList.contains('active') && e.target.closest('.settings-content')) {
-                return;
-            }
-            // それ以外（盤面周りの余白などをスワイプしたとき）は画面を動かさない
-            e.preventDefault();
-        }, { passive: false });
 
         function updateButtonLabels() {
             const newBoardBtn = document.getElementById('new-board-btn');
@@ -1571,6 +1552,7 @@
             });
         });
 
+        // 修正：盤面サイズの変更時のみDOMを初期化する
         document.querySelectorAll('.size-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
                 resolveId++;
@@ -1586,6 +1568,12 @@
                 ROWS = parseInt(e.target.dataset.rows);
                 document.documentElement.style.setProperty('--cols', COLS);
                 document.documentElement.style.setProperty('--rows', ROWS);
+
+                // サイズ変更時のみDOMを全削除してリセットする
+                document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+                board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+                savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+
                 createBoard();
                 updateButtonLabels();
             });
@@ -1859,13 +1847,13 @@
             restoreBoardState(true);
         });
 
+        // 修正：DOMを破棄せず、既存の要素のクラスや色だけを更新する（軽量化）
         function createBoard() {
-            const boardEl = document.getElementById('board');
-            boardEl.querySelectorAll('.orb').forEach(recycleOrbElement);
-            const boardFragment = document.createDocumentFragment();
-
-            board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
-            savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+            if (!board || board.length !== ROWS || board[0]?.length !== COLS) {
+                document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+                board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+                savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+            }
 
             unmatchableColors.clear();
             savedUnmatchableColors.clear();
@@ -1883,42 +1871,91 @@
                         (c >= 2 && board[r][c - 1]?.dataset.color === color && board[r][c - 2]?.dataset.color === color)
                     );
 
-                    let el = createOrbElement(color, r, c);
+                    let el = board[r][c];
+                    if (!el) {
+                        el = createOrbElement(color, r, c);
+                        board[r][c] = el;
+                        document.getElementById('board').appendChild(el);
+                    } else {
+                        if (el.__recycleTimeout) {
+                            clearTimeout(el.__recycleTimeout);
+                            el.__recycleTimeout = null;
+                        }
+                        el.className = 'orb ' + color;
+                        el.dataset.color = color;
+                        el.style.transform = '';
+                        el.style.opacity = '1';
+                        el.style.transition = 'none'; // アニメーションせず即座に変更
+                        el.classList.remove('unmatchable');
+                        el.dataset.unmatchable = 'false';
+                    }
+
+                    el.dataset.r = r;
+                    el.dataset.c = c;
                     el.style.top = `${(r / ROWS) * 100}%`;
                     el.style.left = `${(c / COLS) * 100}%`;
-                    board[r][c] = el;
-                    boardFragment.appendChild(el);
+
+                    setTimeout(() => { if (el) el.style.transition = ''; }, 10);
 
                     savedBoardColors[r][c] = color;
                 }
             }
-            boardEl.appendChild(boardFragment);
             resetComboText();
             updateDropCounts();
         }
 
+        // 修正：DOMを破棄せず、既存の要素のクラスや色だけを更新する（軽量化）
         function restoreBoardState(keepCombo = false) {
-            const boardEl = document.getElementById('board');
-            boardEl.querySelectorAll('.orb').forEach(recycleOrbElement);
-            const boardFragment = document.createDocumentFragment();
-
-            board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+            if (!board || board.length !== ROWS || board[0]?.length !== COLS) {
+                document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+                board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+            }
 
             unmatchableColors = new Set(savedUnmatchableColors);
 
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     let color = (savedBoardColors[r] && savedBoardColors[r][c]) ? savedBoardColors[r][c] : null;
+                    let el = board[r][c];
+
                     if (color) {
-                        let el = createOrbElement(color, r, c);
+                        if (!el) {
+                            el = createOrbElement(color, r, c);
+                            board[r][c] = el;
+                            document.getElementById('board').appendChild(el);
+                        } else {
+                            if (el.__recycleTimeout) {
+                                clearTimeout(el.__recycleTimeout);
+                                el.__recycleTimeout = null;
+                            }
+                            el.className = 'orb ' + color;
+                            el.dataset.color = color;
+                            el.style.transform = '';
+                            el.style.opacity = '1';
+                            el.style.transition = 'none'; // アニメーションせず即座に変更
+
+                            if (unmatchableColors.has(color)) {
+                                el.classList.add('unmatchable');
+                                el.dataset.unmatchable = 'true';
+                            } else {
+                                el.classList.remove('unmatchable');
+                                el.dataset.unmatchable = 'false';
+                            }
+                        }
+
+                        el.dataset.r = r;
+                        el.dataset.c = c;
                         el.style.top = `${(r / ROWS) * 100}%`;
                         el.style.left = `${(c / COLS) * 100}%`;
-                        board[r][c] = el;
-                        boardFragment.appendChild(el);
+
+                        setTimeout(() => { if (el) el.style.transition = ''; }, 10);
+
+                    } else if (el) {
+                        recycleOrbElement(el);
+                        board[r][c] = null;
                     }
                 }
             }
-            boardEl.appendChild(boardFragment);
             if (!keepCombo) {
                 resetComboText();
             }
@@ -2062,10 +2099,14 @@
             }
         }
 
+        // 修正：スワイプのブロック条件を厳密に「盤面関係」のみに絞る
         function handleInputMove(e) {
+            if (isDragging || isPainting || e.target.closest('#board')) {
+                if (e.cancelable) e.preventDefault();
+            }
+
             if (isResolving) return;
             if (!isDragging && !isPainting) return;
-            e.preventDefault();
 
             let { x, y } = getEventPos(e);
             let targetPos = getGridPos(x, y, true);
@@ -2480,8 +2521,6 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        // --- トップへ戻るボタンのJSロジック ---
-        // ※ラッパー内スクロールに変更したため、監視対象を window から main-wrapper に変更
         document.getElementById('main-wrapper').addEventListener('scroll', (e) => {
             const btn = document.getElementById('back-to-top');
             if (e.target.scrollTop > 300) {
