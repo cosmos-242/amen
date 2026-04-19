@@ -52,6 +52,20 @@
             overflow: hidden;
         }
 
+        /* --- タップ遅延とデフォルトハイライトの無効化 --- */
+        button,
+        .tab,
+        .size-tab,
+        .spawn-item,
+        .toggle-label,
+        .usage-summary,
+        input[type="checkbox"],
+        input[type="range"],
+        .palette-orb {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         #footer {
             width: 100vw;
             max-width: calc(100dvh * 9 / 16);
@@ -175,6 +189,9 @@
             flex-direction: column;
             gap: 1.5vh;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.9);
+            /* GPUアクセラレーションを強制し描画を滑らかにする */
+            transform: translateZ(0);
+            will-change: transform;
         }
 
         .settings-header {
@@ -844,7 +861,7 @@
 
             <div id="usage-container">
                 <details class="usage-details">
-                    <summary class="usage-summary">💡 使い方説明</summary>
+                    <summary class="usage-summary"> 使い方説明</summary>
                     <div class="usage-content">
                         <details>
                             <summary>⚙️ 設定メニュー</summary>
@@ -858,7 +875,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ パズルモード</summary>
+                            <summary> パズルモード</summary>
                             <ul>
                                 <li>ドロップを自由に動かしてパズルを練習できます。</li>
                                 <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
@@ -867,7 +884,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ 配置モード</summary>
+                            <summary> 配置モード</summary>
                             <ul>
                                 <li>パレットから色を選び、盤面をタップまたはドラッグで変更できます。</li>
                                 <li>特定のドロップを「消せないドロップ」に設定することもできます。</li>
@@ -876,7 +893,7 @@
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ 組み換えモード</summary>
+                            <summary> 組み換えモード</summary>
                             <ul>
                                 <li>ドロップを動かしても消えず、動かした軌跡（ルート）が記録されます。</li>
                                 <li>ルート作成後は、ルートリセットボタンを押すまで再描画されません。</li>
@@ -1525,57 +1542,63 @@
                 let newMode = e.target.dataset.mode;
                 if (currentMode === newMode) return;
 
-                resolveId++;
-                isResolving = false;
-
-                if (newMode === 'rearrange' && currentMode === 'puzzle') {
-                    saveCurrentBoardState();
-                } else if (currentMode === 'edit' && (newMode === 'puzzle' || newMode === 'rearrange')) {
-                    saveCurrentBoardState();
-                } else if ((currentMode === 'puzzle' || currentMode === 'rearrange') && newMode === 'edit') {
-                    restoreBoardState(true);
-                }
-
+                // 【最適化】1. まずUI（タブの色）を即座に変更してレスポンスを返す
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
-                currentMode = newMode;
 
-                updateButtonLabels();
+                // 【最適化】2. 次の描画フレームで実際の重い処理（DOM操作・状態保存）を行う
+                requestAnimationFrame(() => {
+                    resolveId++;
+                    isResolving = false;
 
-                if (currentMode === 'puzzle' || currentMode === 'rearrange') {
-                    document.getElementById('settings-btn').style.display = '';
-                    document.getElementById('edit-controls').classList.remove('active');
-                } else {
-                    document.getElementById('settings-btn').style.display = 'none';
-                    document.getElementById('edit-controls').classList.add('active');
-                }
+                    if (newMode === 'rearrange' && currentMode === 'puzzle') {
+                        saveCurrentBoardState();
+                    } else if (currentMode === 'edit' && (newMode === 'puzzle' || newMode === 'rearrange')) {
+                        saveCurrentBoardState();
+                    } else if ((currentMode === 'puzzle' || currentMode === 'rearrange') && newMode === 'edit') {
+                        restoreBoardState(true);
+                    }
+
+                    currentMode = newMode;
+                    updateButtonLabels();
+
+                    if (currentMode === 'puzzle' || currentMode === 'rearrange') {
+                        document.getElementById('settings-btn').style.display = '';
+                        document.getElementById('edit-controls').classList.remove('active');
+                    } else {
+                        document.getElementById('settings-btn').style.display = 'none';
+                        document.getElementById('edit-controls').classList.add('active');
+                    }
+                });
             });
         });
 
-        // 修正：盤面サイズの変更時のみDOMを初期化する
         document.querySelectorAll('.size-tab').forEach(tab => {
             tab.addEventListener('click', (e) => {
-                resolveId++;
-                isResolving = false;
-
-                dragRoute = [];
-                drawRoute();
-
+                // 【最適化】1. UIを即座に更新
                 document.querySelectorAll('.size-tab').forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
 
-                COLS = parseInt(e.target.dataset.cols);
-                ROWS = parseInt(e.target.dataset.rows);
-                document.documentElement.style.setProperty('--cols', COLS);
-                document.documentElement.style.setProperty('--rows', ROWS);
+                // 【最適化】2. DOMの破棄と再構築は次のフレームで行う
+                requestAnimationFrame(() => {
+                    resolveId++;
+                    isResolving = false;
 
-                // サイズ変更時のみDOMを全削除してリセットする
-                document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
-                board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
-                savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+                    dragRoute = [];
+                    drawRoute();
 
-                createBoard();
-                updateButtonLabels();
+                    COLS = parseInt(e.target.dataset.cols);
+                    ROWS = parseInt(e.target.dataset.rows);
+                    document.documentElement.style.setProperty('--cols', COLS);
+                    document.documentElement.style.setProperty('--rows', ROWS);
+
+                    document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+                    board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+                    savedBoardColors = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+
+                    createBoard();
+                    updateButtonLabels();
+                });
             });
         });
 
@@ -1847,7 +1870,6 @@
             restoreBoardState(true);
         });
 
-        // 修正：DOMを破棄せず、既存の要素のクラスや色だけを更新する（軽量化）
         function createBoard() {
             if (!board || board.length !== ROWS || board[0]?.length !== COLS) {
                 document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
@@ -1904,7 +1926,6 @@
             updateDropCounts();
         }
 
-        // 修正：DOMを破棄せず、既存の要素のクラスや色だけを更新する（軽量化）
         function restoreBoardState(keepCombo = false) {
             if (!board || board.length !== ROWS || board[0]?.length !== COLS) {
                 document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
@@ -2099,7 +2120,6 @@
             }
         }
 
-        // 修正：スワイプのブロック条件を厳密に「盤面関係」のみに絞る
         function handleInputMove(e) {
             if (isDragging || isPainting || e.target.closest('#board')) {
                 if (e.cancelable) e.preventDefault();
