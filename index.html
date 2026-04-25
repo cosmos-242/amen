@@ -7,7 +7,6 @@
     <title>PadBoardEditor</title>
 
     <link rel="manifest" href="manifest.json">
-
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PadBoardEditor">
@@ -19,13 +18,9 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(registration => {
-                        console.log('ServiceWorkerが登録されました', registration.scope);
-                    })
-                    .catch(error => {
-                        console.log('ServiceWorkerの登録に失敗しました', error);
-                    });
+                navigator.serviceWorker.register('sw.js').catch(error => {
+                    console.log('ServiceWorkerの登録に失敗しました', error);
+                });
             });
         }
     </script>
@@ -79,29 +74,22 @@
             <div id="settings-modal">
                 <div class="settings-content">
                     <div class="settings-header">設定</div>
-
                     <div class="settings-subheader" style="margin-top: 0;">盤面サイズ設定</div>
                     <div id="size-tabs">
                         <div class="size-tab active" data-cols="6" data-rows="5">6×5 マス</div>
                         <div class="size-tab" data-cols="7" data-rows="6">7×6 マス</div>
                     </div>
-
                     <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
                     <div class="settings-subheader" style="margin-top: 0;">新しい盤面設定</div>
                     <div id="spawn-settings" class="spawn-settings"></div>
-
                     <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
                     <div style="display: flex; justify-content: space-around; width: 100%;">
                         <label class="toggle-label"><input type="checkbox" id="ochicon-toggle" autocomplete="off">
                             落ちコンあり </label>
                         <label class="toggle-label"><input type="checkbox" id="count-toggle" checked autocomplete="off">
                             ドロップ個数表示 </label>
                     </div>
-
                     <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
                     <div style="display: flex; justify-content: center; align-items: center; gap: 2vw; width: 100%;">
                         <span style="font-size: 1.8vh; font-weight: bold; color: #ffd700;">〇個以下で消せない</span>
                         <label class="toggle-label"><input type="checkbox" id="min-4-toggle" autocomplete="off">
@@ -109,9 +97,7 @@
                         <label class="toggle-label"><input type="checkbox" id="min-5-toggle" autocomplete="off">
                             4</label>
                     </div>
-
                     <hr style="border: none; border-top: 1px solid #555; margin: 0.5vh 0;">
-
                     <div class="control-row"><label>消える速度: <span id="combo-speed-display">0.20</span>s</label><input
                             type="range" id="combo-speed-slider" min="0.05" max="1.0" step="0.05" value="0.2"></div>
                     <div class="control-row"><label>落下速度: <span id="speed-display">0.1</span>s</label><input
@@ -122,15 +108,24 @@
                             type="range" id="autoplay-speed-slider" min="0.01" max="0.5" step="0.01" value="0.15"></div>
                     <div class="control-row"><label>ルートの太さ: <span id="route-width-display">0.04</span></label><input
                             type="range" id="route-width-slider" min="0.01" max="0.1" step="0.01" value="0.04"></div>
-
                     <button id="close-settings-btn" class="close-btn">閉じる</button>
                 </div>
             </div>
 
+            <div id="restore-modal">
+                <div class="settings-content" style="text-align: center; gap: 2vh;">
+                    <h3 style="color: #fff; margin: 0; font-size: 2.2vh;">前回のデータがあります</h3>
+                    <p style="color: #ccc; font-size: 1.6vh; margin: 0;">前回の続きから再開しますか？</p>
+                    <div style="display: flex; gap: 10px; margin-top: 1vh;">
+                        <button id="restore-yes-btn" class="close-btn"
+                            style="flex: 1; background: #0088ff;">再開する</button>
+                        <button id="restore-no-btn" class="close-btn" style="flex: 1; background: #555;">新しく始める</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="footer">
-
             <div id="usage-container">
                 <details class="usage-details">
                     <summary class="usage-summary">💡 使い方説明</summary>
@@ -184,7 +179,7 @@
                 style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: left; border: 1px solid #444;">
                 <h3 style="margin-top: 0; color: #ffd700; font-size: 16px;">✨ アプリのように使えます</h3>
                 <p style="margin-bottom: 0; font-size: 13px; color: #ccc;">
-                    このサイトはPWA技術に対応しています。ホーム画面に追加することで、ブラウザの<b>検索バーやステータスバーが非表示</b>になり、画面いっぱいに表示して本物のアプリのように快適に操作できるようになります。
+                    このサイトはPWA技術に対応しています。ホーム画面に追加することで、ブラウザの<b>検索バーやステータスバーが非表示</b>になり、画面いっぱいに盤面を表示して本物のアプリのように快適に操作できるようになります。
                 </p>
             </div>
 
@@ -195,9 +190,9 @@
                         <details>
                             <summary>iPhone (Safari)</summary>
                             <ul>
-                                <li>共有ボタン（四角から上矢印）をタップします。</li>
+                                <li>画面下部中央にある「共有ボタン（四角から上矢印）」をタップします。</li>
                                 <li>メニューを下にスクロールし、「ホーム画面に追加」を選択します。</li>
-                                <li>右上の「追加」をタップすると完了です。※Webアプリとして開くをオン</li>
+                                <li>右上の「追加」をタップすると完了です。</li>
                             </ul>
                         </details>
                         <details>

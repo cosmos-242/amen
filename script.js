@@ -902,11 +902,123 @@ document.getElementById('main-wrapper').addEventListener('scroll', (e) => {
     else { btn.style.display = 'none'; }
 });
 
+function saveToStorage() {
+    if (currentMode === 'edit') saveCurrentBoardState();
+
+    const data = {
+        settings: {
+            cols: COLS,
+            rows: ROWS,
+            activeSpawnColors: activeSpawnColors,
+            minMatchCount: minMatchCount,
+            ochicon: document.getElementById('ochicon-toggle').checked,
+            count: document.getElementById('count-toggle').checked,
+            comboSpeed: document.getElementById('combo-speed-slider').value,
+            speed: document.getElementById('speed-slider').value,
+            swapSpeed: document.getElementById('swap-speed-slider').value,
+            autoplaySpeed: document.getElementById('autoplay-speed-slider').value,
+            routeWidth: document.getElementById('route-width-slider').value
+        },
+        boardColors: savedBoardColors,
+        unmatchable: Array.from(savedUnmatchableColors),
+        route: dragRoute
+    };
+    localStorage.setItem('padBoardEditorData', JSON.stringify(data));
+}
+
+function loadFromStorage() {
+    const raw = localStorage.getItem('padBoardEditorData');
+    initDropCountDisplay();
+
+    if (raw) {
+        try {
+            const data = JSON.parse(raw);
+
+            if (data.settings) {
+                COLS = data.settings.cols || 6;
+                ROWS = data.settings.rows || 5;
+                document.documentElement.style.setProperty('--cols', COLS);
+                document.documentElement.style.setProperty('--rows', ROWS);
+
+                document.querySelectorAll('.size-tab').forEach(t => {
+                    t.classList.remove('active');
+                    if (parseInt(t.dataset.cols) === COLS) t.classList.add('active');
+                });
+
+                if (data.settings.activeSpawnColors) activeSpawnColors = data.settings.activeSpawnColors;
+                document.querySelectorAll('#spawn-settings input').forEach(cb => {
+                    cb.checked = activeSpawnColors.includes(cb.value);
+                });
+
+                minMatchCount = data.settings.minMatchCount || 3;
+                document.getElementById('min-4-toggle').checked = (minMatchCount === 4);
+                document.getElementById('min-5-toggle').checked = (minMatchCount === 5);
+
+                document.getElementById('ochicon-toggle').checked = !!data.settings.ochicon;
+                document.getElementById('count-toggle').checked = (data.settings.count !== false);
+                if (!document.getElementById('count-toggle').checked) document.getElementById('drop-counts').classList.add('hidden');
+
+                if (data.settings.comboSpeed) { document.getElementById('combo-speed-slider').value = data.settings.comboSpeed; document.getElementById('combo-speed-display').innerText = parseFloat(data.settings.comboSpeed).toFixed(2); }
+                if (data.settings.speed) { document.getElementById('speed-slider').value = data.settings.speed; document.getElementById('speed-display').innerText = parseFloat(data.settings.speed).toFixed(1); document.documentElement.style.setProperty('--fall-speed', data.settings.speed + 's'); }
+                if (data.settings.swapSpeed) { document.getElementById('swap-speed-slider').value = data.settings.swapSpeed; document.getElementById('swap-speed-display').innerText = parseFloat(data.settings.swapSpeed).toFixed(2); document.documentElement.style.setProperty('--swap-speed', data.settings.swapSpeed + 's'); }
+                if (data.settings.autoplaySpeed) { document.getElementById('autoplay-speed-slider').value = data.settings.autoplaySpeed; document.getElementById('autoplay-speed-display').innerText = parseFloat(data.settings.autoplaySpeed).toFixed(2); }
+                if (data.settings.routeWidth) { document.getElementById('route-width-slider').value = data.settings.routeWidth; document.getElementById('route-width-display').innerText = parseFloat(data.settings.routeWidth).toFixed(2); routeWidthBase = parseFloat(data.settings.routeWidth); }
+            }
+
+            if (data.boardColors && data.boardColors.length === ROWS && data.boardColors[0].length === COLS) {
+                const modal = document.getElementById('restore-modal');
+                modal.classList.add('active');
+
+                document.getElementById('restore-yes-btn').onclick = () => {
+                    modal.classList.remove('active');
+                    savedBoardColors = data.boardColors;
+                    savedUnmatchableColors = new Set(data.unmatchable || []);
+                    unmatchableColors = new Set(savedUnmatchableColors);
+                    if (data.route) dragRoute = data.route;
+
+                    document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+                    board = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+
+                    restoreBoardState(true);
+                    drawRoute();
+                    updateButtonLabels();
+                };
+
+                document.getElementById('restore-no-btn').onclick = () => {
+                    modal.classList.remove('active');
+                    dragRoute = [];
+                    createBoard();
+                    updateButtonLabels();
+                    saveToStorage();
+                };
+
+                return;
+            }
+        } catch (e) {
+            console.error("Storage load error", e);
+        }
+    }
+
+    createBoard();
+    updateButtonLabels();
+}
+
+window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveToStorage();
+});
+window.addEventListener('pagehide', () => saveToStorage());
+
+document.getElementById('main-wrapper').addEventListener('scroll', (e) => {
+    const btn = document.getElementById('back-to-top');
+    if (e.target.scrollTop > 300) { btn.style.display = 'block'; }
+    else { btn.style.display = 'none'; }
+});
 document.getElementById('back-to-top').addEventListener('click', () => {
     document.getElementById('main-wrapper').scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-initDropCountDisplay(); createBoard(); updateButtonLabels();
+loadFromStorage();
+
 window.addEventListener('pageshow', (event) => {
     document.getElementById('min-4-toggle').checked = (minMatchCount === 4);
     document.getElementById('min-5-toggle').checked = (minMatchCount === 5);
