@@ -699,6 +699,7 @@ input[type=range] {
     margin-bottom: 5px;
 }
 
+/* 修正：トップに戻るボタンを透明度で制御し、強制スクロール停止を防ぐ */
 #back-to-top {
     position: fixed;
     bottom: 20px;
@@ -712,9 +713,15 @@ input[type=range] {
     font-size: 20px;
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-    display: none;
+    opacity: 0;
+    pointer-events: none;
     z-index: 1000;
     transition: opacity 0.3s, transform 0.3s;
+}
+
+#back-to-top.show {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 #back-to-top:hover {
