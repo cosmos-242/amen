@@ -570,47 +570,47 @@ input[type=range] {
 
 /* 修正箇所: images の前に ../ を付けて一つ上の階層を参照するように変更 */
 .red {
-    background: url('../images/dp.png') 0% 0% / 500% 200% no-repeat;
+    background: url('images/dp.png') 0% 0% / 500% 200% no-repeat;
 }
 
 .blue {
-    background: url('../images/dp.png') 25% 0% / 500% 200% no-repeat;
+    background: url('images/dp.png') 25% 0% / 500% 200% no-repeat;
 }
 
 .green {
-    background: url('../images/dp.png') 50% 0% / 500% 200% no-repeat;
+    background: url('images/dp.png') 50% 0% / 500% 200% no-repeat;
 }
 
 .yellow {
-    background: url('../images/dp.png') 75% 0% / 500% 200% no-repeat;
+    background: url('images/dp.png') 75% 0% / 500% 200% no-repeat;
 }
 
 .purple {
-    background: url('../images/dp.png') 0% 100% / 500% 200% no-repeat;
+    background: url('images/dp.png') 0% 100% / 500% 200% no-repeat;
 }
 
 .heal {
-    background: url('../images/dp.png') 50% 100% / 500% 200% no-repeat;
+    background: url('images/dp.png') 50% 100% / 500% 200% no-repeat;
     border-radius: 20%;
 }
 
 .ojama {
-    background: url('../images/dp.png') 25% 100% / 500% 200% no-repeat;
+    background: url('images/dp.png') 25% 100% / 500% 200% no-repeat;
     border-radius: 20%;
 }
 
 .poison {
-    background: url('../images/dp.png') 75% 100% / 500% 200% no-repeat;
+    background: url('images/dp.png') 75% 100% / 500% 200% no-repeat;
     border-radius: 20%;
 }
 
 .mortal {
-    background: url('../images/dp.png') 100% 100% / 500% 200% no-repeat;
+    background: url('images/dp.png') 100% 100% / 500% 200% no-repeat;
     border-radius: 20%;
 }
 
 .bom {
-    background: url('../images/bom.png') center/100% 100% no-repeat, radial-gradient(circle at 30% 30%, #555, #222);
+    background: url('images/bom.png') center/100% 100% no-repeat, radial-gradient(circle at 30% 30%, #555, #222);
 }
 
 .unmatchable::before {
