@@ -4,20 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>定石メーカー</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
-    <link rel="manifest" href="manifest.json">
+    <title>定石メーカー (テスト環境)</title>
+
+    <link rel="manifest" href="../manifest.json">
 
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PadBoardEditor">
-    <link rel="apple-touch-icon" href="images/icon-192.png">
+    <link rel="apple-touch-icon" href="../images/icon-192.png">
+
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
 
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
+                navigator.serviceWorker.register('../sw.js')
                     .then(registration => {
                         console.log('ServiceWorkerが登録されました', registration.scope);
                     })
@@ -128,6 +130,7 @@
         </div>
 
         <div id="footer">
+
             <div id="usage-container">
                 <details class="usage-details">
                     <summary class="usage-summary">💡 使い方説明</summary>
@@ -144,32 +147,31 @@
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ パズルモード</summary>
+                            <summary>パズルモード</summary>
                             <ul>
                                 <li>ドロップを自由に動かしてパズルを練習できます。</li>
-                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
+                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。</li>
                                 <li>「リセット」ボタン：即座にパズル前の盤面に戻します。</li>
                                 <li>「ルート表示・非表示」ボタン：組み換えモードで記録したルートの表示切替ができます。</li>
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ 配置モード</summary>
+                            <summary>配置モード</summary>
                             <ul>
                                 <li>パレットから色を選び、盤面をタップまたはドラッグで変更できます。</li>
                                 <li>特定のドロップを「消せないドロップ」に設定することもできます。</li>
-                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。（設定メニューよりカスタムすることができます。）</li>
+                                <li>「新しい盤面」ボタン：ランダムで盤面を生成します。</li>
                                 <li>「リセット」ボタン：即座にドロップ変更前の盤面に戻します。</li>
                             </ul>
                         </details>
                         <details>
-                            <summary>▶ 組み換えモード</summary>
+                            <summary>組み換えモード</summary>
                             <ul>
                                 <li>ドロップを動かしても消えず、動かした軌跡（ルート）が記録されます。</li>
                                 <li>ルート作成後は、ルートリセットボタンを押すまで再描画されません。</li>
                                 <li>「盤面リセット」ボタン：即座にパズル前の盤面に戻します。</li>
                                 <li>「ルートリセット」ボタン：記録されたルートを削除します。</li>
                                 <li>「逆再現」ボタン：組み換え前後（パズル前後の盤面とルート）の切り替えができます。</li>
-                                <li>「ルート表示・非表示」ボタン：保存したルートの表示切替ができます。</li>
                                 <li>「自動再生」ボタン：作成したルートの動きを確認できます。</li>
                                 <li>「左右入れ替え」ボタン：盤面とルートの左右を入れ替えます。</li>
                             </ul>
@@ -178,7 +180,39 @@
                 </details>
             </div>
 
-            <p>※当サイトは『パズル＆ドラゴンズ』の非公式ファンツール（配置シミュレーター）です。</p>
+            <div id="pwa-benefits"
+                style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: left; border: 1px solid #444;">
+                <h3 style="margin-top: 0; color: #ffd700; font-size: 16px;">✨ アプリのように使えます</h3>
+                <p style="margin-bottom: 0; font-size: 13px; color: #ccc;">
+                    このサイトはPWA技術に対応しています。ホーム画面に追加することで、ブラウザの<b>検索バーやステータスバーが非表示</b>になり、画面いっぱいに表示して本物のアプリのように快適に操作できるようになります。
+                </p>
+            </div>
+
+            <div id="usage-container">
+                <details class="usage-details">
+                    <summary class="usage-summary">📱 アプリ化（ホーム画面に追加）の方法</summary>
+                    <div class="usage-content">
+                        <details>
+                            <summary>iPhone (Safari)</summary>
+                            <ul>
+                                <li>共有ボタン（四角から上矢印）をタップします。</li>
+                                <li>メニューを下にスクロールし、「ホーム画面に追加」を選択します。</li>
+                                <li>右上の「追加」をタップすると完了です。※Webアプリとして開くをオン</li>
+                            </ul>
+                        </details>
+                        <details>
+                            <summary>Android (Chrome)</summary>
+                            <ul>
+                                <li>画面右上にある「メニューボタン（︙）」をタップします。</li>
+                                <li>「ホーム画面に追加」または「アプリをインストール」を選択します。</li>
+                                <li>画面の指示に従って追加すれば完了です。</li>
+                            </ul>
+                        </details>
+                    </div>
+                </details>
+            </div>
+
+            <p style="margin-top: 30px;">※当サイトは『パズル＆ドラゴンズ』の非公式ファンツールです。</p>
             <p>ガンホー・オンライン・エンターテイメント株式会社様、および関連企業様とは一切関係ございません。</p>
 
             <p class="highlight-text" style="margin-top: 20px; border-top: 1px solid #333; padding-top: 10px;">
@@ -187,7 +221,7 @@
         </div>
     </div>
 
-    <button id="back-to-top" title="トップへ戻る">▲</button>
+    <button id="back-to-top" title="トップへ戻る">▲ 上部へ戻る</button>
 </body>
 
 </html>
