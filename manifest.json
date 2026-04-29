@@ -1,5 +1,5 @@
 {
-    "name": "定石メーカー",
+    "name": "PadBoardEditor",
     "short_name": "PadBoardEditor",
     "description": "配置シミュレーター",
     "start_url": "./index.html",
