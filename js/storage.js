@@ -72,12 +72,10 @@ export function loadFromStorage() {
         }
     }
 
-    // 起動時は設定だけ適用し、盤面は新しく作る
     createBoard();
     updateButtonLabels();
 }
 
-// 「データ呼出」ボタンを押した時に呼ばれる関数（盤面とルートを復元する）
 export function applyLastSavedData() {
     const raw = localStorage.getItem('padBoardEditorData');
     if (!raw) {
@@ -91,6 +89,22 @@ export function applyLastSavedData() {
             alert("盤面データが保存されていません。");
             return;
         }
+
+        const loadedRows = data.boardColors.length;
+        const loadedCols = data.boardColors[0].length;
+
+        state.ROWS = loadedRows;
+        state.COLS = loadedCols;
+
+        document.documentElement.style.setProperty('--cols', state.COLS);
+        document.documentElement.style.setProperty('--rows', state.ROWS);
+
+        document.querySelectorAll('.size-tab').forEach(t => {
+            t.classList.remove('active');
+            if (parseInt(t.dataset.cols) === state.COLS) {
+                t.classList.add('active');
+            }
+        });
 
         state.savedBoardColors = data.boardColors;
         state.savedUnmatchableColors = new Set(data.unmatchable || []);
