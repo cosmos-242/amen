@@ -149,7 +149,7 @@ input[type="range"],
     box-shadow: none;
 }
 
-#settings-modal {
+/* #settings-modal {
     position: absolute;
     top: 0;
     left: 0;
@@ -166,11 +166,12 @@ input[type="range"],
 
 #settings-modal.active {
     display: flex;
-}
+} */
 
 .settings-content {
     width: 85%;
-    max-height: 90vh;
+    max-width: 390px;
+    max-height: 88vh;
     overflow-y: auto;
     background: #222;
     border: 2px solid #555;
@@ -280,7 +281,7 @@ input[type=range] {
 }
 
 .close-btn {
-    margin-top: 1vh;
+    margin-top: 0;
     padding: 1.5vh;
     background: #e60088;
     color: white;
@@ -735,7 +736,7 @@ input[type=range] {
     transform: scale(1.1);
 }
 
-#restore-modal {
+/* #restore-modal {
     position: absolute;
     top: 0;
     left: 0;
@@ -752,21 +753,21 @@ input[type=range] {
 
 #restore-modal.active {
     display: flex;
-}
+} */
 
 .reset-settings-btn {
-    margin-top: 2vh;
-    padding: 1.2vh;
+    margin-top: 0.5vh;
+    padding: 0.8vh;
     background: #444;
     color: #ccc;
     border: 1px solid #555;
     border-radius: 8px;
     font-weight: bold;
-    font-size: 1.5vh;
+    font-size: 1.4vh;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
     align-self: center;
-    width: 60%;
+    width: 55%;
     transition: background-color 0.2s, transform 0.05s;
 }
 
@@ -779,21 +780,25 @@ input[type=range] {
     background-color: #555;
 }
 
+#settings-modal,
+#restore-modal,
 #reset-confirm-modal {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: calc(100vw * 16 / 9);
-    max-height: 100dvh;
-    max-width: calc(100dvh * 9 / 16);
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
     background: rgba(0, 0, 0, 0.85);
-    z-index: 10000;
+    z-index: 99999;
     display: none;
     justify-content: center;
     align-items: center;
 }
 
+#settings-modal.active,
+#restore-modal.active,
 #reset-confirm-modal.active {
     display: flex;
 }
