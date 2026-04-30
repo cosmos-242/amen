@@ -22,7 +22,7 @@ export function updateButtonLabels() {
     const toggleBtn = document.getElementById('toggle-route-btn');
     const reverseBtn = document.getElementById('reverse-route-btn');
     const autoplayBtn = document.getElementById('autoplay-btn');
-
+    const loadDataBtn = document.getElementById('load-data-manual-btn');
     const rowAutoplay = document.getElementById('row-autoplay');
     const rowReverse = document.getElementById('row-reverse');
 
@@ -35,12 +35,14 @@ export function updateButtonLabels() {
         rowAutoplay.style.display = 'none';
         rowReverse.style.display = 'flex';
         toggleBtn.style.display = 'block';
+        loadDataBtn.style.display = 'block';
         reverseBtn.style.display = 'none';
     } else if (state.currentMode === 'rearrange') {
         rowAutoplay.style.display = 'flex';
         rowReverse.style.display = 'flex';
         toggleBtn.style.display = 'block';
         reverseBtn.style.display = 'block';
+        loadDataBtn.style.display = 'none';
     }
 
     if (state.currentMode === 'rearrange') {
@@ -66,6 +68,27 @@ export function updateButtonLabels() {
         toggleBtn.classList.remove('hidden-route');
         reverseBtn.classList.remove('has-route');
         autoplayBtn.classList.remove('has-route');
+    }
+
+    if (loadDataBtn) {
+        let hasData = false;
+        const raw = localStorage.getItem('padBoardEditorData');
+        if (raw) {
+            try {
+                const data = JSON.parse(raw);
+                if (data.boardColors && data.boardColors.length > 0) {
+                    hasData = true;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        if (hasData) {
+            loadDataBtn.classList.add('has-data');
+        } else {
+            loadDataBtn.classList.remove('has-data');
+        }
     }
 }
 
@@ -102,6 +125,12 @@ export function initUI() {
         });
     });
 
+    const loadDataBtn = document.getElementById('load-data-manual-btn');
+
+    loadDataBtn.addEventListener('click', () => {
+        if (state.isResolving) return;
+        import('./storage.js').then(m => m.applyLastSavedData());
+    });
     // ----------------------------------------------------
     // パレットの生成
     // ----------------------------------------------------
@@ -329,18 +358,7 @@ export function initUI() {
         state.resolveId++;
         state.isResolving = true;
 
-        if (state.isReversedState && state.originalBoardColors) {
-            for (let r = 0; r < state.ROWS; r++) {
-                for (let c = 0; c < state.COLS; c++) {
-                    state.savedBoardColors[r][c] = state.originalBoardColors[r][c];
-                }
-            }
-            state.isReversedState = false;
-            state.dragRoute.reverse();
-        }
-
         restoreBoardState(true);
-        // パズルロジック側に切り出した自動再生関数を呼び出す
         startAutoplay();
     });
 

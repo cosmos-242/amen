@@ -170,8 +170,17 @@ export function handleInputEnd() {
         if (state.currentMode === 'puzzle') {
             resolveMatches();
         } else if (state.currentMode === 'rearrange') {
-            drawRoute();
+            // drawRoute();
+            state.isResolving = true;
             updateButtonLabels();
+            setTimeout(() => {
+                state.isReversedState = false;
+                state.originalBoardColors = null;
+
+                restoreBoardState(true);
+                drawRoute();
+                state.isResolving = false;
+            }, 1000);
         }
 
     } else if (state.currentMode === 'edit') {
@@ -621,7 +630,10 @@ export function startAutoplay() {
             movingOrb.dataset.c = route[route.length - 1].c;
 
             resetComboText();
-            resolveMatches();
+
+            setTimeout(() => {
+                resolveMatches();
+            }, 300);
         }
     }
     requestAnimationFrame(autoPlayStep);

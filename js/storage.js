@@ -27,6 +27,7 @@ export function saveToStorage() {
     localStorage.setItem('padBoardEditorData', JSON.stringify(data));
 }
 
+// アプリ起動時に呼ばれる関数（設定のみ適用し、盤面は新規作成する）
 export function loadFromStorage() {
     const raw = localStorage.getItem('padBoardEditorData');
     initDropCountDisplay();
@@ -35,6 +36,7 @@ export function loadFromStorage() {
         try {
             const data = JSON.parse(raw);
 
+            // 設定項目の復元
             if (data.settings) {
                 state.COLS = data.settings.cols || 6;
                 state.ROWS = data.settings.rows || 5;
@@ -65,41 +67,45 @@ export function loadFromStorage() {
                 if (data.settings.autoplaySpeed) { document.getElementById('autoplay-speed-slider').value = data.settings.autoplaySpeed; document.getElementById('autoplay-speed-display').innerText = parseFloat(data.settings.autoplaySpeed).toFixed(2); }
                 if (data.settings.routeWidth) { document.getElementById('route-width-slider').value = data.settings.routeWidth; document.getElementById('route-width-display').innerText = parseFloat(data.settings.routeWidth).toFixed(2); state.routeWidthBase = parseFloat(data.settings.routeWidth); }
             }
-
-            if (data.boardColors && data.boardColors.length === state.ROWS && data.boardColors[0].length === state.COLS) {
-                const modal = document.getElementById('restore-modal');
-                modal.classList.add('active');
-
-                document.getElementById('restore-yes-btn').onclick = () => {
-                    modal.classList.remove('active');
-                    state.savedBoardColors = data.boardColors;
-                    state.savedUnmatchableColors = new Set(data.unmatchable || []);
-                    state.unmatchableColors = new Set(state.savedUnmatchableColors);
-                    if (data.route) state.dragRoute = data.route;
-
-                    document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
-                    state.board = Array.from({ length: state.ROWS }, () => new Array(state.COLS).fill(null));
-
-                    restoreBoardState(true);
-                    drawRoute();
-                    updateButtonLabels();
-                };
-
-                document.getElementById('restore-no-btn').onclick = () => {
-                    modal.classList.remove('active');
-                    state.dragRoute = [];
-                    createBoard();
-                    updateButtonLabels();
-                    saveToStorage();
-                };
-
-                return;
-            }
         } catch (e) {
             console.error("Storage load error", e);
         }
     }
 
+    // 起動時は設定だけ適用し、盤面は新しく作る
     createBoard();
     updateButtonLabels();
+}
+
+// 「データ呼出」ボタンを押した時に呼ばれる関数（盤面とルートを復元する）
+export function applyLastSavedData() {
+    const raw = localStorage.getItem('padBoardEditorData');
+    if (!raw) {
+        alert("保存されたデータがありません。");
+        return;
+    }
+
+    try {
+        const data = JSON.parse(raw);
+        if (!data.boardColors || data.boardColors.length === 0) {
+            alert("盤面データが保存されていません。");
+            return;
+        }
+
+        state.savedBoardColors = data.boardColors;
+        state.savedUnmatchableColors = new Set(data.unmatchable || []);
+        state.unmatchableColors = new Set(state.savedUnmatchableColors);
+        if (data.route) state.dragRoute = data.route;
+
+        document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
+        state.board = Array.from({ length: state.ROWS }, () => new Array(state.COLS).fill(null));
+
+        restoreBoardState(true);
+        drawRoute();
+        updateButtonLabels();
+
+    } catch (e) {
+        console.error("Load error", e);
+        alert("データの読み込みに失敗しました。");
+    }
 }

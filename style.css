@@ -34,6 +34,7 @@ body {
 
 #app-container {
     position: relative;
+    z-index: 100;
     width: 100vw;
     flex-shrink: 0;
     height: calc(100vw * 16 / 9);
@@ -432,11 +433,17 @@ input[type=range] {
 #toggle-route-btn,
 #reverse-route-btn,
 #autoplay-btn,
-#mirror-btn {
+#mirror-btn,
+#load-data-manual-btn {
     background-color: #555;
 }
 
 #toggle-route-btn.has-route {
+    background-color: #00aaff;
+    color: #fff;
+}
+
+#load-data-manual-btn.has-data {
     background-color: #00aaff;
     color: #fff;
 }
