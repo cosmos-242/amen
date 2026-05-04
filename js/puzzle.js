@@ -197,8 +197,11 @@ function updateDragPosition(x, y) {
     const rect = state.cachedBoardRect || boardEl.getBoundingClientRect();
     const cellW = state.cachedCellW || rect.width / state.COLS;
     const cellH = state.cachedCellH || rect.height / state.ROWS;
+
+    // Y座標の計算を変更: セルの高さの0.9倍（指の少し上）になるようにオフセット
     let leftPx = (x - rect.left) - cellW / 2;
-    let topPx = (y - rect.top) - cellH / 2;
+    let topPx = (y - rect.top) - cellH * 0.9;
+
     state.draggedElement.style.left = `${(leftPx / rect.width) * 100}%`;
     state.draggedElement.style.top = `${(topPx / rect.height) * 100}%`;
 }

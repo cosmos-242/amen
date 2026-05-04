@@ -377,6 +377,49 @@ input[type=range] {
     box-sizing: border-box;
 }
 
+#board-buttons-wrapper.puzzle-mode {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0.8vh 2vw;
+}
+
+#board-buttons-wrapper.puzzle-mode .btn-row {
+    display: contents !important;
+}
+
+#board-buttons-wrapper.puzzle-mode button {
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+}
+
+#board-buttons-wrapper.puzzle-mode #mirror-btn,
+#board-buttons-wrapper.puzzle-mode #autoplay-btn,
+#board-buttons-wrapper.puzzle-mode #reverse-route-btn {
+    display: none !important;
+}
+
+#board-buttons-wrapper.puzzle-mode #load-data-manual-btn {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+#board-buttons-wrapper.puzzle-mode #toggle-route-btn {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+#board-buttons-wrapper.puzzle-mode #new-board-btn {
+    grid-column: 1;
+    grid-row: 3;
+}
+
+#board-buttons-wrapper.puzzle-mode #reset-btn {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+}
+
 .btn-row {
     display: flex;
     justify-content: space-between;
@@ -488,6 +531,7 @@ input[type=range] {
     background-color: #333;
     background-image: linear-gradient(to right, rgba(0, 0, 0, 0.6) 2px, transparent 2px), linear-gradient(to bottom, rgba(0, 0, 0, 0.6) 2px, transparent 2px);
     background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+    background-position: -1px -1px;
     border: 3px solid #444;
     border-radius: 8px;
     box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
@@ -763,4 +807,109 @@ input[type=range] {
 #restore-modal.active,
 #reset-confirm-modal.active {
     display: flex;
+}
+
+.settings-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 10px;
+}
+
+.settings-content::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+.settings-content {
+    padding: 20px !important;
+    gap: 15px !important;
+}
+
+.settings-header {
+    font-size: 20px !important;
+    margin-bottom: 5px !important;
+}
+
+.settings-subheader {
+    font-size: 16px !important;
+    margin-top: 15px !important;
+}
+
+.settings-subheader:first-of-type {
+    margin-top: 0 !important;
+}
+
+.size-tab {
+    padding: 10px 0 !important;
+    font-size: 16px !important;
+}
+
+.spawn-settings {
+    gap: 12px !important;
+    margin-bottom: 10px !important;
+}
+
+.spawn-item input {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.toggle-label {
+    font-size: 14px !important;
+}
+
+.toggle-label input {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.control-row {
+    font-size: 14px !important;
+}
+
+.close-btn {
+    padding: 12px !important;
+    font-size: 16px !important;
+}
+
+.reset-settings-btn {
+    padding: 10px !important;
+    font-size: 14px !important;
+    width: 80% !important;
+    max-width: 250px;
+}
+
+.settings-content div[style*="gap: 2vw"] {
+    gap: 15px !important;
+}
+
+.settings-content span[style*="font-size: 1.8vh"] {
+    font-size: 15px !important;
+}
+
+.settings-content hr {
+    margin: 8px 0 !important;
+}
+
+.action-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8vh;
+}
+
+.action-right {
+    flex: 1;
+    display: flex;
+}
+
+.action-right button {
+    width: 100%;
+    height: 100%;
 }

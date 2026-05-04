@@ -17,6 +17,7 @@ import { startAutoplay, resetComboText } from './puzzle.js';
 import { saveToStorage } from './storage.js';
 
 export function updateButtonLabels() {
+    document.getElementById('board-buttons-wrapper').className = state.currentMode + '-mode';
     const newBoardBtn = document.getElementById('new-board-btn');
     const resetBtn = document.getElementById('reset-btn');
     const toggleBtn = document.getElementById('toggle-route-btn');
