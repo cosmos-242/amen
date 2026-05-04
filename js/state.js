@@ -44,6 +44,12 @@ export const state = {
 
     dropCountElements: {},
     dropCountsQueued: false,
-    orbPool: []
+    orbPool: [],
 
+    rouletteCells: new Set(),
+    savedRouletteCells: new Set(),
+    rouletteSequence: ['red', 'blue', 'green', 'yellow', 'purple', 'heal'],
+    rouletteSpeed: 1.0,
+    rouletteTimer: null,
+    rouletteIndex: 0
 };

@@ -101,6 +101,9 @@ export function handleInputStart(e) {
             if (state.selectedEditColor === 'unmatchable' && el) {
                 state.paintUnmatchableTargetState = state.unmatchableColors.has(el.dataset.color) ? 'false' : 'true';
             }
+            else if (state.selectedEditColor === 'roulette') {
+                state.paintUnmatchableTargetState = state.rouletteCells.has(`${targetPos.r},${targetPos.c}`) ? 'false' : 'true';
+            }
             paintOrb(targetPos.r, targetPos.c);
         }
     }
@@ -173,6 +176,7 @@ export function handleInputEnd() {
             // drawRoute();
             state.isResolving = true;
             updateButtonLabels();
+            import('./board.js').then(m => m.toggleRouletteVisibility(false));
             setTimeout(() => {
                 state.isReversedState = false;
                 state.originalBoardColors = null;
@@ -180,6 +184,7 @@ export function handleInputEnd() {
                 restoreBoardState(true);
                 drawRoute();
                 state.isResolving = false;
+                import('./board.js').then(m => m.toggleRouletteVisibility(true));
             }, 1000);
         }
 
@@ -210,6 +215,14 @@ export function paintOrb(r, c) {
     const paintKey = `${r},${c},${state.selectedEditColor},${state.paintUnmatchableTargetState}`;
     if (state.currentMode === 'edit' && state.isPainting && state.lastPaintCellKey === paintKey) return;
     state.lastPaintCellKey = paintKey;
+
+    if (state.selectedEditColor === 'roulette') {
+        const posKey = `${r},${c}`;
+        if (state.paintUnmatchableTargetState === 'true') state.rouletteCells.add(posKey);
+        else state.rouletteCells.delete(posKey);
+        import('./board.js').then(m => m.syncRouletteDisplay());
+        return;
+    }
 
     let el = state.board[r][c];
     if (!el) {
@@ -265,6 +278,8 @@ export async function resolveMatches() {
     state.resolveId++;
     const currentResolveId = state.resolveId;
     state.isResolving = true;
+
+    import('./board.js').then(m => m.toggleRouletteVisibility(false));
 
     let isOchiconEnabled = document.getElementById('ochicon-toggle').checked;
     let comboDelayMs = parseFloat(document.getElementById('combo-speed-slider').value) * 1000;
@@ -408,6 +423,8 @@ export async function resolveMatches() {
             if (currentResolveId === state.resolveId) {
                 restoreBoardState(true);
                 state.isResolving = false;
+
+                import('./board.js').then(m => m.toggleRouletteVisibility(true));
             }
         }, 1000);
     }

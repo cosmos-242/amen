@@ -239,3 +239,128 @@ export function createOrbElement(color, r, c) {
     el.style.height = `${100 / state.ROWS}%`;
     return el;
 }
+
+// --- ルーレット処理 ---
+export function syncRouletteDisplay() {
+    // 1. ルーレットを閉じ込める「背景専用レイヤー」を探すか、新規作成する
+    let bgLayer = document.getElementById('board-bg-layer');
+    if (!bgLayer) {
+        bgLayer = document.createElement('div');
+        bgLayer.id = 'board-bg-layer';
+        // このレイヤーの z-index を 0 に固定することで、中のバグごとドロップ(3)の裏に隔離する
+        bgLayer.style.position = 'absolute';
+        bgLayer.style.top = '0';
+        bgLayer.style.left = '0';
+        bgLayer.style.width = '100%';
+        bgLayer.style.height = '100%';
+        bgLayer.style.zIndex = '0';
+        bgLayer.style.pointerEvents = 'none';
+        document.getElementById('board').prepend(bgLayer);
+    }
+
+    // 2. 古い要素をクリア（レイヤーの中身を空にする）
+    bgLayer.innerHTML = '';
+
+    // 解決中（コンボ中）はタイマーだけ回して描画はしない
+    if (state.isResolving) {
+        restartRouletteTimer();
+        return;
+    }
+
+    state.rouletteCells.forEach(key => {
+        let [r, c] = key.split(',').map(Number);
+
+        // ゲージ（白半透明）を生成して「背景レイヤー」に入れる
+        let bg = document.createElement('div');
+        bg.className = 'roulette-bg';
+        bg.style.top = `${(r / state.ROWS) * 100}%`;
+        bg.style.left = `${(c / state.COLS) * 100}%`;
+        bg.style.width = `${100 / state.COLS}%`;
+        bg.style.height = `${100 / state.ROWS}%`;
+        bgLayer.appendChild(bg);
+
+        // 装飾枠（画像）を生成して「背景レイヤー」に入れる
+        let frame = document.createElement('div');
+        frame.className = 'roulette-frame';
+        frame.style.top = `${(r / state.ROWS) * 100}%`;
+        frame.style.left = `${(c / state.COLS) * 100}%`;
+        frame.style.width = `${100 / state.COLS}%`;
+        frame.style.height = `${100 / state.ROWS}%`;
+        bgLayer.appendChild(frame);
+    });
+
+    restartRouletteTimer();
+}
+
+export function toggleRouletteVisibility(isVisible) {
+    let bgLayer = document.getElementById('board-bg-layer');
+    if (bgLayer) {
+        bgLayer.style.display = isVisible ? 'block' : 'none';
+    }
+
+    if (isVisible) {
+        restartRouletteTimer();
+    } else {
+        if (state.rouletteTimer) {
+            clearInterval(state.rouletteTimer);
+            state.rouletteTimer = null;
+        }
+    }
+}
+export function restartRouletteTimer() {
+    if (state.rouletteTimer) {
+        clearInterval(state.rouletteTimer);
+        state.rouletteTimer = null;
+    }
+    if (state.rouletteCells.size === 0) return;
+
+    document.documentElement.style.setProperty('--roulette-speed', state.rouletteSpeed + 's');
+
+    document.querySelectorAll('.roulette-bg').forEach(bg => {
+        bg.style.animation = 'none';
+        void bg.offsetWidth;
+        bg.style.animation = '';
+    });
+
+    state.rouletteTimer = setInterval(() => {
+        if (state.isResolving || state.rouletteSequence.length === 0) return;
+
+        document.querySelectorAll('.roulette-bg').forEach(bg => {
+            bg.style.animation = 'none';
+            void bg.offsetWidth; // リフロー強制
+            bg.style.animation = '';
+        });
+
+        state.rouletteCells.forEach(key => {
+            let [r, c] = key.split(',').map(Number);
+            let el = state.board[r][c];
+
+            // 掴まれていない、かつ落下中ではない場合のみ変化
+            if (el && state.draggedElement !== el && !el.classList.contains('falling')) {
+                let currentColor = el.dataset.color;
+                let currentIndex = state.rouletteSequence.indexOf(currentColor);
+
+                // 現在の色がルーレット設定に含まれていれば次の色へ。なければ最初の色へ。
+                let nextIndex = 0;
+                if (currentIndex !== -1) {
+                    nextIndex = (currentIndex + 1) % state.rouletteSequence.length;
+                }
+
+                let nextColor = state.rouletteSequence[nextIndex];
+                let isUnmatchable = el.dataset.unmatchable === 'true';
+
+                el.style.transition = 'none';
+
+                el.className = 'orb ' + nextColor + (isUnmatchable ? ' unmatchable' : '');
+                el.dataset.color = nextColor;
+
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        el.style.transition = '';
+                    });
+                });
+            }
+        });
+        updateDropCounts();
+    }, state.rouletteSpeed * 1000);
+}

@@ -922,3 +922,89 @@ input[type=range] {
     width: 100%;
     height: 100%;
 }
+
+/* =========================================
+   ルーレットと回復ドロップの微調整
+========================================= */
+/* パレットのルーレットアイコン */
+
+@property --roulette-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes roulette-fill {
+    0% {
+        --roulette-angle: 0deg;
+    }
+
+    100% {
+        --roulette-angle: 360deg;
+    }
+}
+
+.palette-orb.roulette {
+    background: url('images/roulette_icon.png') center/cover no-repeat;
+    border: none !important;
+    border-radius: 20% !important;
+}
+
+.palette-orb.roulette::after {
+    content: none;
+}
+
+.roulette-frame {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 2;
+    background: url('images/roulette_frame.png') center/100% 100% no-repeat;
+    transform: scale(1.0);
+}
+
+/* 盤面のルーレット背景（プログレスリング） */
+.roulette-bg {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 1;
+    /* 装飾枠(2)の下に配置 */
+    border-radius: 50%;
+
+    /* ▼ 修正点: 黒ずみの原因になっていた「下地のうすい白リング」を完全に削除 ▼ */
+    background-color: transparent;
+
+    /* くるくる回るメインエフェクト */
+    background-image: conic-gradient(rgba(255, 255, 255, 0.9) var(--roulette-angle, 0deg), transparent var(--roulette-angle, 0deg));
+
+    /* サイズをフレーム(1.0)とドロップの間の大きさに設定 */
+    transform: scale(0.96);
+    animation: roulette-fill var(--roulette-speed, 1s) linear infinite;
+
+    /* 中心を綺麗にくり抜いてリング状にする */
+    -webkit-mask-image: radial-gradient(closest-side, transparent 80%, black 85%);
+    mask-image: radial-gradient(closest-side, transparent 80%, black 85%);
+}
+
+.orb {
+    z-index: 3 !important;
+}
+
+.orb.dragging {
+    z-index: 9999 !important;
+}
+
+/* --- ▼ 修正点: 回復ドロップ・爆弾ドロップのサイズ調整 --- */
+/* 爆弾ドロップも背景領域が広いため、回復ドロップと同じサイズまで縮小してフチを見せる */
+.orb.heal,
+.orb.bom {
+    transform: scale(0.86);
+}
+
+.mini-orb.heal,
+.palette-orb.heal,
+.mini-orb.bom,
+.palette-orb.bom {
+    transform: scale(0.9);
+}

@@ -154,6 +154,46 @@ export function initUI() {
         else paletteBottom.appendChild(div);
     });
 
+    // パレットにルーレットを追加
+    let rouletteDiv = document.createElement('div');
+    rouletteDiv.className = `palette-orb roulette ${state.selectedEditColor === 'roulette' ? 'selected' : ''}`;
+    rouletteDiv.dataset.color = 'roulette';
+    rouletteDiv.addEventListener('click', () => {
+        document.querySelectorAll('.palette-orb').forEach(p => p.classList.remove('selected'));
+        rouletteDiv.classList.add('selected');
+        state.selectedEditColor = 'roulette';
+    });
+    document.getElementById('palette-bottom').appendChild(rouletteDiv); // 消せないドロップの次に配置
+
+    // 設定メニュー：ルーレットの順序と速度
+    const rouletteSettingsEl = document.getElementById('roulette-settings');
+    const baseRouletteOrder = ['red', 'blue', 'green', 'yellow', 'purple', 'heal', 'ojama', 'poison', 'mortal', 'bom'];
+    baseRouletteOrder.forEach(color => {
+        let label = document.createElement('label');
+        label.className = 'spawn-item';
+        let cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = color;
+        cb.checked = state.rouletteSequence.includes(color);
+        let icon = document.createElement('div');
+        icon.className = `mini-orb ${color}`;
+        label.appendChild(cb);
+        label.appendChild(icon);
+        rouletteSettingsEl.appendChild(label);
+
+        cb.addEventListener('change', () => {
+            const checkedInputs = Array.from(document.querySelectorAll('#roulette-settings input:checked')).map(i => i.value);
+            state.rouletteSequence = baseRouletteOrder.filter(c => checkedInputs.includes(c));
+        });
+    });
+
+    document.getElementById('roulette-speed-slider').addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value).toFixed(1);
+        document.getElementById('roulette-speed-display').innerText = val;
+        state.rouletteSpeed = parseFloat(val);
+        import('./board.js').then(m => m.restartRouletteTimer());
+    });
+
     // ----------------------------------------------------
     // モーダルと基本トグル関連
     // ----------------------------------------------------
@@ -360,6 +400,7 @@ export function initUI() {
         state.isResolving = true;
 
         restoreBoardState(true);
+        import('./board.js').then(m => m.toggleRouletteVisibility(false));
         startAutoplay();
     });
 

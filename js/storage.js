@@ -18,10 +18,15 @@ export function saveToStorage() {
             speed: document.getElementById('speed-slider').value,
             swapSpeed: document.getElementById('swap-speed-slider').value,
             autoplaySpeed: document.getElementById('autoplay-speed-slider').value,
-            routeWidth: document.getElementById('route-width-slider').value
+            routeWidth: document.getElementById('route-width-slider').value,
+            // ルーレットの設定を追加
+            rouletteSpeed: state.rouletteSpeed,
+            rouletteSequence: state.rouletteSequence
         },
         boardColors: state.savedBoardColors,
         unmatchable: Array.from(state.savedUnmatchableColors),
+        // ルーレットの配置データ（Setを配列に変換して保存）を追加
+        rouletteCells: Array.from(state.savedRouletteCells),
         route: state.dragRoute
     };
     localStorage.setItem('padBoardEditorData', JSON.stringify(data));
@@ -66,6 +71,19 @@ export function loadFromStorage() {
                 if (data.settings.swapSpeed) { document.getElementById('swap-speed-slider').value = data.settings.swapSpeed; document.getElementById('swap-speed-display').innerText = parseFloat(data.settings.swapSpeed).toFixed(2); document.documentElement.style.setProperty('--swap-speed', data.settings.swapSpeed + 's'); }
                 if (data.settings.autoplaySpeed) { document.getElementById('autoplay-speed-slider').value = data.settings.autoplaySpeed; document.getElementById('autoplay-speed-display').innerText = parseFloat(data.settings.autoplaySpeed).toFixed(2); }
                 if (data.settings.routeWidth) { document.getElementById('route-width-slider').value = data.settings.routeWidth; document.getElementById('route-width-display').innerText = parseFloat(data.settings.routeWidth).toFixed(2); state.routeWidthBase = parseFloat(data.settings.routeWidth); }
+
+                // ルーレットの順序設定と速度設定の復元
+                if (data.settings.rouletteSequence) {
+                    state.rouletteSequence = data.settings.rouletteSequence;
+                    document.querySelectorAll('#roulette-settings input').forEach(cb => {
+                        cb.checked = state.rouletteSequence.includes(cb.value);
+                    });
+                }
+                if (data.settings.rouletteSpeed) {
+                    state.rouletteSpeed = data.settings.rouletteSpeed;
+                    document.getElementById('roulette-speed-slider').value = state.rouletteSpeed;
+                    document.getElementById('roulette-speed-display').innerText = parseFloat(state.rouletteSpeed).toFixed(1);
+                }
             }
         } catch (e) {
             console.error("Storage load error", e);
@@ -107,8 +125,14 @@ export function applyLastSavedData() {
         });
 
         state.savedBoardColors = data.boardColors;
+
+        // 消せないドロップの復元
         state.savedUnmatchableColors = new Set(data.unmatchable || []);
         state.unmatchableColors = new Set(state.savedUnmatchableColors);
+
+        // ルーレットの配置データの復元
+        state.savedRouletteCells = new Set(data.rouletteCells || []);
+
         if (data.route) state.dragRoute = data.route;
 
         document.getElementById('board').querySelectorAll('.orb').forEach(recycleOrbElement);
